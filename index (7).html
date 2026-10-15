@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بنك الأسئلة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+body{margin:0;background:#140a0a;color:#f4eaea;font:16px Cairo,system-ui,sans-serif}
+#app{max-width:560px;margin:auto;padding:12px}
+.card{background:#241212;border:1px solid #3a1c1c;border-radius:14px;padding:16px;margin:10px 0}
+input,textarea,select{width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d;color:inherit;font:inherit}
+button{font:inherit;color:inherit;cursor:pointer}
+.btn{width:100%;padding:12px;border:0;border-radius:10px;background:#c0262d;font-weight:700;margin-top:6px}
+.btn:disabled{opacity:.5}
+.link{background:none;border:0;color:#e88;padding:6px}
+.pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
+.top,.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sub,.ch{display:block;width:100%;text-align:start;padding:14px;margin:8px 0;border-radius:12px;border:1px solid #3a1c1c;background:#241212}
+.ch{background:#1b0d0d;padding:12px;margin:6px 0}
+.ch.ok{border-color:#2e9e5b;background:#12301f}
+.ch.bad{border-color:#d64545;background:#3a1414}
+.row{display:flex;gap:6px;margin:6px 0}
+.row button{flex:1;padding:10px;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}
+.row .on{background:#c0262d;border-color:#c0262d}
+.msg{color:#e88;min-height:1.2em}
+.q{font-size:18px;line-height:1.7}
+.pb{height:4px;background:#3a1c1c;border-radius:4px;margin-top:8px}
+.pb i{display:block;height:100%;background:#c0262d;border-radius:4px}
+.crumb{color:#a88;font-size:13px;margin:8px 0}
+.sub.mine{border-color:#c0262d}
+h3{margin:16px 0 4px;color:#e88}
+</style>
+</head>
+<body>
+<div id="app"><p style="padding:24px;text-align:center">جاري التحميل...</p></div>
+<script src="config.js"></script>
+<script>
+window.onerror = (m, s, l) => { const a = document.getElementById('app'); if (a) a.innerHTML = '<div class="card"><b>حصل خطأ:</b><pre dir="ltr" style="white-space:pre-wrap">' + String(m).replace(/</g, '&lt;') + ' (line ' + l + ')</pre></div>' };
+const mem = {};
+const ls = {
+  get: k => { try { return localStorage.getItem(k) } catch (e) { return mem[k] == null ? null : mem[k] } },
+  set: (k, v) => { mem[k] = v; try { localStorage.setItem(k, v) } catch (e) {} },
+  del: k => { delete mem[k]; try { localStorage.removeItem(k) } catch (e) {} }
+};
+/* ====== عدّل القيم دي بس ====== */
+const AC = window.APP_CONFIG || {};
+const SUPABASE_URL = AC.url || "PASTE_PROJECT_URL";
+const SUPABASE_ANON_KEY = (AC.key && !AC.key.includes('PASTE')) ? AC.key : "PASTE_ANON_KEY";
+const PAY_INFO = AC.payInfo || "حوّل المبلغ على رقم: 01XXXXXXXXX ثم اكتب رقم العملية.";
+const SUPPORT = AC.support || "@YourSupportBot";
+/* ============================== */
+
+const $ = s => document.querySelector(s), app = $('#app');
+const on = (s, f) => { const e = $(s); if (e) e.onclick = f };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g, '');
+const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
+let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {};
+let subs = [], meta = [], metaFor = null, curYear = 0, curSub = null, curLec = null;
+let retry = new Set(), reviewing = false;
+
+// ==MINI-CLIENT-START==
+function makeClient(url, key) {
+  let sess = null;
+  try { sess = JSON.parse(ls.get('sbsess') || 'null') } catch (e) {}
+  const save = s => {
+    if (s && !s.expires_at) s.expires_at = Math.floor(Date.now() / 1000) + (s.expires_in || 3600);
+    sess = s;
+    try { s ? ls.set('sbsess', JSON.stringify(s)) : ls.del('sbsess') } catch (e) {}
+  };
+  const read = async r => {
+    const t = await r.text(); let j = null;
+    try { j = t ? JSON.parse(t) : null } catch (e) {}
+    if (!r.ok) return { data: null, error: { message: (j && (j.message || j.msg || j.error_description || j.error)) || r.statusText, status: r.status } };
+    return { data: j, error: null };
+  };
+  const ensure = async () => {
+    if (!sess || !sess.refresh_token || sess.expires_at - 60 > Date.now() / 1000) return;
+    const r = await fetch(url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: sess.refresh_token }) });
+    save(r.ok ? await r.json() : null);
+  };
+  const headers = extra => {
+    const h = Object.assign({ apikey: key, 'Content-Type': 'application/json' }, extra);
+    if (sess) h.Authorization = 'Bearer ' + sess.access_token;
+    return h;
+  };
+  const call = async (path, opt) => { await ensure(); return read(await fetch(url + path, opt)) };
+
+  class Q {
+    constructor(t) { this.t = t; this.p = new URLSearchParams(); this.o = []; this.m = 'GET'; this.b = null; this.one = false }
+    select(c = '*') { this.p.set('select', c); return this }
+    insert(b) { this.m = 'POST'; this.b = b; return this }
+    delete() { this.m = 'DELETE'; return this }
+    eq(c, v) { this.p.append(c, 'eq.' + v); return this }
+    order(c, o = {}) { this.o.push(c + (o.ascending === false ? '.desc' : '.asc')); return this }
+    limit(n) { this.p.set('limit', n); return this }
+    offset(n) { this.p.set('offset', n); return this }
+    inList(c, arr) { this.p.append(c, 'in.(' + arr.join(',') + ')'); return this }
+    is(c, v) { this.p.append(c, 'is.' + v); return this }
+    single() { this.one = true; return this }
+    then(a, b) {
+      if (this.o.length) this.p.set('order', this.o.join(','));
+      const extra = {};
+      if (this.one) extra.Accept = 'application/vnd.pgrst.object+json';
+      if (this.m !== 'GET') extra.Prefer = 'return=minimal';
+      const qs = this.p.toString().replace(/\+/g, '%20');
+      return call('/rest/v1/' + this.t + (qs ? '?' + qs : ''), { method: this.m, headers: headers(extra), body: this.b ? JSON.stringify(this.b) : undefined }).then(a, b);
+    }
+  }
+  return {
+    from: t => new Q(t),
+    rpc: (n, args) => call('/rest/v1/rpc/' + n, { method: 'POST', headers: headers(), body: JSON.stringify(args || {}) }),
+    auth: {
+      getSession: async () => { await ensure(); return { data: { session: sess } } },
+      signInWithPassword: async ({ email, password }) => {
+        const r = await read(await fetch(url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }));
+        if (r.error) return { data: null, error: r.error };
+        save(r.data); return { data: r.data, error: null };
+      },
+      signOut: async () => {
+        try { if (sess) await fetch(url + '/auth/v1/logout', { method: 'POST', headers: headers() }) } catch (e) {}
+        save(null); return { error: null };
+      }
+    }
+  };
+}
+// ==MINI-CLIENT-END==
+
+if (location.hash === '#reset') { ls.del('cfg_url'); ls.del('cfg_key'); }
+const CFG = {
+  url: SUPABASE_URL.includes('PASTE') ? (ls.get('cfg_url') || '') : SUPABASE_URL,
+  key: SUPABASE_ANON_KEY.includes('PASTE') ? (ls.get('cfg_key') || '') : SUPABASE_ANON_KEY
+};
+const fail = m => { app.innerHTML = '<div class="card"><b>حصل خطأ:</b><pre dir="ltr" style="white-space:pre-wrap">' + esc(m) + '</pre></div>' };
+window.onunhandledrejection = e => fail((e.reason && e.reason.message) || e.reason);
+
+const start = () => {
+  sb = makeClient(CFG.url, CFG.key);
+  sb.auth.getSession().then(({data}) => data.session ? enter() : authView(false)).catch(e => fail(e.message || e));
+};
+if (!CFG.url || !CFG.key) {
+  app.innerHTML = '<div class="card"><h2>إعداد الاتصال</h2><input id="cu" dir="ltr" placeholder="Project URL"><input id="ck" dir="ltr" placeholder="Publishable key"><button class="btn" id="cs">حفظ</button></div>';
+  on('#cs', () => {
+    CFG.url = $('#cu').value.trim().replace(/\/+$/, '');
+    CFG.key = $('#ck').value.trim();
+    ls.set('cfg_url', CFG.url); ls.set('cfg_key', CFG.key);
+    start();
+  });
+} else start();
+
+const dev = ls.get('dev') || (() => {
+  const v = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+  ls.set('dev', v); return v;
+})();
+
+function pick(sel, cb) {
+  document.querySelectorAll(sel + ' button').forEach(b => b.onclick = () => {
+    document.querySelectorAll(sel + ' button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); cb(b.dataset.v);
+  });
+}
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span><button class="pill" id="wl">💳 ${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
+function bindTop() {
+  on('#wl', () => walletView());
+  on('#lo', async () => { await sb.auth.signOut(); authView(false) });
+}
+
+function authView(su) {
+  view = 'auth'; let year = 0;
+  app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
+    (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3,4,5].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
+    `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
+    <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
+    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
+  if (su) pick('#yr', v => year = +v);
+  on('#sw', () => authView(!su));
+  on('#go', async () => {
+    const m = t => { $('#m').textContent = t }, p = toEn($('#p').value), w = $('#w').value;
+    $('#go').disabled = true;
+    try {
+      if (su) {
+        const r = await fetch(`${CFG.url}/functions/v1/signup`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', apikey: CFG.key},
+          body: JSON.stringify({name: $('#n').value, year, phone: p, password: w, device_id: dev})
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) return m(j.error || 'حصلت مشكلة، حاول تاني');
+      }
+      const {error} = await sb.auth.signInWithPassword({email: p + '@exam.local', password: w});
+      if (error) return m('الرقم أو كلمة السر غلط');
+      enter();
+    } finally { if ($('#go')) $('#go').disabled = false }
+  });
+}
+
+async function enter() {
+  const {data: p} = await sb.from('profiles').select('*').single();
+  if (!p) return authView(false);
+  me = p;
+  const {data: r} = await sb.rpc('charge_daily');
+  if (!r || !r.ok) return r && r.reason === 'no_balance' ? (me.balance = r.balance, walletView(true)) : blockedView(r && r.reason);
+  me.balance = r.balance;
+  homeView();
+}
+
+function blockedView(r) {
+  view = 'blocked';
+  const pend = r === 'pending';
+  app.innerHTML = `<div class="card"><h2>${pend ? '⏳ حسابك قيد المراجعة' : '⛔ الحساب موقوف'}</h2>
+    <p>${pend ? 'الجهاز ده اتعمل عليه حساب قبل كده. كلمنا على ' + esc(SUPPORT) + ' عشان نفعّل حسابك.' : 'كلمنا على ' + esc(SUPPORT)}</p>
+    ${pend ? '<button class="btn" id="rf">تحديث</button>' : ''}<button class="link" id="lo">خروج</button></div>`;
+  on('#rf', enter);
+  on('#lo', async () => { await sb.auth.signOut(); authView(false) });
+}
+
+const LEC_ALL = '__all__';
+const chOf = m => (m.chapter && m.chapter.trim()) || '';
+const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
+const solvedIn = a => a.filter(m => answered[m.id]).length;
+const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
+const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
+const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curSub ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
+const loading = () => { app.innerHTML = topBar() + '<p style="padding:24px;text-align:center">جاري التحميل...</p>'; bindTop() };
+
+async function fetchAll(mk) {
+  let all = [], from = 0;
+  for (;;) {
+    const {data, error} = await mk().limit(1000).offset(from);
+    if (error) return {data: null, error};
+    all = all.concat(data || []);
+    if (!data || data.length < 1000) return {data: all, error: null};
+    from += 1000;
+  }
+}
+
+async function fetchByIds(ids) {
+  let all = [];
+  for (let k = 0; k < ids.length; k += 200) {
+    const {data, error} = await sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').inList('id', ids.slice(k, k + 200)).order('id');
+    if (error) return {data: null, error};
+    all = all.concat(data || []);
+  }
+  all.sort((a, b) => a.id - b.id);
+  return {data: all, error: null};
+}
+
+// 1) years
+async function homeView() {
+  view = 'home'; curYear = 0; curSub = null; curLec = null;
+  const {data: s} = await sb.from('subjects').select('*').order('year').order('block').order('name');
+  subs = s || [];
+  const cnt = y => subs.filter(x => x.year === y).length;
+  app.innerHTML = topBar() + '<h2>اختار الفرقة</h2>' + [1, 2, 3, 4, 5].map(y =>
+    '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>الفرقة ' + y + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
+    '<br><small>' + (cnt(y) ? cnt(y) + ' مادة' : 'قريباً') + '</small></button>').join('');
+  bindTop();
+  document.querySelectorAll('.sub').forEach(b => b.onclick = () => subjectsView(+b.dataset.y));
+}
+
+// 2) subjects of a year, grouped by block
+function subjectsView(y) {
+  view = 'subjects'; curYear = y; curSub = null; curLec = null;
+  const list = subs.filter(x => x.year === y);
+  let html = topBar() + crumb() + '<button class="link" id="bk">‹ الفرق</button><h2>مواد الفرقة ' + y + '</h2>';
+  if (!list.length) html += '<p>لسه مفيش مواد</p>';
+  let last = null;
+  list.forEach(x => {
+    if (x.block !== last) { html += '<h3>' + esc(x.block) + '</h3>'; last = x.block }
+    html += '<button class="sub" data-id="' + x.id + '"><b>' + esc(x.name) + '</b></button>';
+  });
+  app.innerHTML = html; bindTop(); on('#bk', () => sectionsView());
+  document.querySelectorAll('.sub').forEach(b => b.onclick = () => lecturesView(subs.find(x => x.id === +b.dataset.id)));
+}
+
+// 3) lectures of a subject (a lecture = the "chapter" column)
+async function lecturesView(sub) {
+  view = 'lectures'; curSub = sub; curLec = null;
+  if (metaFor !== sub.id) {
+    loading();
+    const [m, a, b] = await Promise.all([
+      fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
+      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
+      sb.from('bookmarks').select('question_id')
+    ]);
+    if (m.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return subjectsView(curYear) }
+    meta = m.data; answered = {};
+    (a.data || []).forEach(x => answered[x.question_id] = x);
+    saved = new Set((b.data || []).map(x => x.question_id));
+    metaFor = sub.id;
+  }
+  const groups = {};
+  meta.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
+  const card = (k, t, arr) => {
+    const w = arr.filter(isWrong).length;
+    return '<button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' +
+      (w ? ' <small style="color:#e88">· ❌ ' + w + ' خطأ</small>' : '') + bar(solvedIn(arr), arr.length) + '</button>';
+  };
+  let html = topBar() + crumb() + '<button class="link" id="bk">‹ المواد</button><h2>' + esc(sub.name) + '</h2>';
+  if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
+  else {
+    const nw = meta.filter(isWrong).length;
+    if (nw) html += '<button class="btn" id="mk">❌ أخطائي (' + nw + ') - مقسمة على المحاضرات</button>';
+    html += card(LEC_ALL, 'كل المحاضرات', meta);
+    Object.keys(groups).forEach(k => { html += card(k, lecName(k), groups[k]) });
+  }
+  app.innerHTML = html; bindTop(); on('#bk', () => subjectsView(curYear)); on('#mk', mistakesView);
+  document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
+}
+
+// 4) question sections of a lecture: all / important / by source / by type
+function sectionsView(k) {
+  if (k === undefined) k = curLec;
+  view = 'sections'; curLec = k;
+  const arr = k === LEC_ALL ? meta : meta.filter(q => chOf(q) === k);
+  const secs = [{t: 'كل الأسئلة', f: {}, a: arr}];
+  const wr = arr.filter(isWrong);
+  if (wr.length) secs.push({t: '❌ أخطائي', f: {wrong: 1}, a: wr, plain: 1});
+  const key = arr.filter(q => q.is_key_point);
+  if (key.length) secs.push({t: '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
+  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
+  if (new Set(arr.map(q => q.type)).size > 1) ['mcq', 'written'].forEach(t => {
+    const a2 = arr.filter(q => q.type === t);
+    if (a2.length) secs.push({t: t === 'mcq' ? 'اختيار من متعدد' : 'مقالي', f: {type: t}, a: a2});
+  });
+  app.innerHTML = topBar() + crumb() + '<button class="link" id="bk">‹ المحاضرات</button><h2>' + esc(lecName(k)) + '</h2>' +
+    secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
+      ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
+      : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + ' سؤال</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
+  bindTop(); on('#bk', () => lecturesView(curSub));
+  document.querySelectorAll('.sec').forEach(b => b.onclick = () => startQuiz(secs[+b.dataset.n].f));
+}
+
+// my mistakes, divided by lecture
+function mistakesView() {
+  view = 'mistakes'; curLec = null;
+  const groups = {};
+  meta.filter(isWrong).forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
+  const total = meta.filter(isWrong).length;
+  const btn = (k, t, n) => '<button class="sub mk" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + n + ' سؤال للمراجعة</small></button>';
+  let html = topBar() + crumb() + '<button class="link" id="bk">‹ المحاضرات</button><h2>❌ أخطائي</h2>';
+  if (!total) html += '<p>مفيش أخطاء، تمام!</p>';
+  else {
+    html += btn(LEC_ALL, 'مراجعة كل الأخطاء', total);
+    Object.keys(groups).forEach(k => { html += btn(k, lecName(k), groups[k].length) });
+  }
+  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
+  document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
+}
+
+// 5) load the chosen section and start the quiz
+async function startQuiz(f) {
+  loading();
+  const scope = curLec === LEC_ALL ? meta : meta.filter(q => chOf(q) === curLec);
+  let res;
+  if (f.wrong) {
+    const ids = scope.filter(isWrong).map(q => q.id);
+    retry = new Set(ids);
+    res = await fetchByIds(ids);
+  } else {
+    retry = new Set();
+    res = await fetchAll(() => {
+      let q = sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').eq('subject_id', curSub.id);
+      if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
+      if (f.key) q = q.eq('is_key_point', 'true');
+      if (f.src) q = q.eq('source_tag', f.src);
+      if (f.type) q = q.eq('type', f.type);
+      return q.order('id');
+    });
+  }
+  if (res.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return sectionsView() }
+  qs = res.data; reviewing = !!f.wrong;
+  const first = qs.findIndex(x => !answered[x.id]);
+  i = (f.wrong || first < 0) ? 0 : first;
+  quizView();
+}
+
+function go(d) { i = Math.max(0, Math.min(qs.length - 1, i + d)); quizView() }
+
+function quizView() {
+  view = 'quiz'; const q = qs[i];
+  if (!q) {
+    app.innerHTML = topBar() + '<div class="card">مفيش أسئلة في المادة دي لسه</div><button class="btn" id="bk">رجوع</button>';
+    bindTop(); on('#bk', () => sectionsView()); return;
+  }
+  const a = retry.has(q.id) ? null : answered[q.id];
+  app.innerHTML = topBar() + `<div class="bar"><button class="link" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="link" id="st">${saved.has(q.id) ? '★' : '☆'}</button></div>
+    <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
+    <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>`;
+  bindTop(); on('#bk', () => sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  on('#st', async () => {
+    if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
+    else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
+    $('#st').textContent = saved.has(q.id) ? '★' : '☆';
+  });
+  const box = $('#ans');
+  if (q.type === 'mcq') {
+    box.innerHTML = (q.choices || []).map((c, k) => `<button class="ch" data-k="${k}" dir="auto"><b>${'ABCDE'[k]}.</b> ${esc(c)}</button>`).join('');
+    const mark = (k, cor) => document.querySelectorAll('.ch').forEach(b => {
+      const n = +b.dataset.k; b.disabled = true;
+      if (n === cor) b.classList.add('ok'); else if (n === k) b.classList.add('bad');
+    });
+    if (a) mark(a.chosen_index, a.is_correct ? a.chosen_index : -1);
+    if (a && !a.is_correct) sb.rpc('get_answer_key', {qid: q.id}).then(r => { if (!r.error && r.data && qs[i] === q) mark(a.chosen_index, r.data.correct_index) });
+    document.querySelectorAll('.ch').forEach(b => b.onclick = async () => {
+      if (answered[q.id] && !retry.has(q.id)) return;
+      const k = +b.dataset.k, {data, error} = await sb.rpc('submit_answer', {qid: q.id, idx: k});
+      if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
+      answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id);
+      mark(k, data.correct_index);
+    });
+  } else {
+    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
+    on('#rv', async () => {
+      const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
+      if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
+      $('#mo').style.display = 'block'; $('#mo').textContent = data || 'مفيش إجابة نموذجية';
+    });
+  }
+}
+
+async function walletView(forced) {
+  view = 'wallet'; let amt = 30;
+  const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
+  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: ${me.balance} جنيه</h2>
+    ${forced ? '<p class="msg">رصيدك خلص، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
+    <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
+    <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
+    <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
+    <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
+    <button class="link" id="rf">تحديث الرصيد</button><button class="link" id="bk">رجوع</button></div>` +
+    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} ج — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
+  bindTop(); pick('#am', v => amt = +v);
+  on('#sd', async () => {
+    const {error} = await sb.from('topup_requests').insert({user_id: me.id, amount: amt, method: $('#mt').value, proof_note: $('#pf').value.trim()});
+    $('#m').textContent = error ? 'حصلت مشكلة، حاول تاني' : 'تم إرسال الطلب، هيتراجع ويتضاف الرصيد';
+  });
+  on('#rf', enter); on('#bk', enter);
+}
+
+document.onkeydown = e => {
+  if (view !== 'quiz' || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key === 'ArrowLeft') go(1);
+  else if (e.key === 'ArrowRight') go(-1);
+  else if (/^[1-5]$/.test(e.key)) { const b = document.querySelectorAll('.ch')[+e.key - 1]; if (b) b.click() }
+};
+</script>
+</body>
+</html>
