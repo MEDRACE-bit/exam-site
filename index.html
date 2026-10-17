@@ -168,7 +168,7 @@ const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
-  on('#lo', async () => { await sb.auth.signOut(); authView(false) });
+  on('#lo', async () => { if (!confirm('متأكد إنك عايز تخرج من حسابك؟')) return; await sb.auth.signOut(); authView(false) });
 }
 
 function authView(su) {
@@ -217,7 +217,7 @@ function blockedView(r) {
     <p>${pend ? 'الجهاز ده اتعمل عليه حساب قبل كده. كلمنا على ' + esc(SUPPORT) + ' عشان نفعّل حسابك.' : 'كلمنا على ' + esc(SUPPORT)}</p>
     ${pend ? '<button class="btn" id="rf">تحديث</button>' : ''}<button class="link" id="lo">خروج</button></div>`;
   on('#rf', enter);
-  on('#lo', async () => { await sb.auth.signOut(); authView(false) });
+  on('#lo', async () => { if (!confirm('متأكد إنك عايز تخرج من حسابك؟')) return; await sb.auth.signOut(); authView(false) });
 }
 
 const LEC_ALL = '__all__';
