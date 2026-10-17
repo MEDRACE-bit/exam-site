@@ -314,7 +314,7 @@ async function lecturesView(sub) {
     const nw = meta.filter(isWrong).length;
     if (nw) html += '<button class="btn" id="mk">❌ أخطائي (' + nw + ') - مقسمة على المحاضرات</button>';
     html += card(LEC_ALL, 'كل المحاضرات', meta);
-    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups
+    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
   app.innerHTML = html; bindTop(); on('#bk', () => subjectsView(curYear)); on('#mk', mistakesView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
@@ -354,7 +354,7 @@ function mistakesView() {
   if (!total) html += '<p>مفيش أخطاء، تمام!</p>';
   else {
     html += btn(LEC_ALL, 'مراجعة كل الأخطاء', total);
-    Object.keys(groups).forEach(k => { html += btn(k, lecName(k), groups[k].length) });
+    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += btn(k, lecName(k), groups[k].length) });
   }
   app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
   document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
