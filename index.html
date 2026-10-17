@@ -164,7 +164,7 @@ function pick(sel, cb) {
     b.classList.add('on'); cb(b.dataset.v);
   });
 }
-const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div><div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div>`;
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
@@ -173,7 +173,7 @@ function bindTop() {
 
 function authView(su) {
   view = 'auth'; let year = 0;
-  app.innerHTML = `<div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div><div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
+  app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3,4,5].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
@@ -471,7 +471,7 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
+  app.innerHTML = topBar() + `<div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
     ${forced ? '<p class="msg">رصيدك خلص، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
