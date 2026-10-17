@@ -175,7 +175,7 @@ function bindTop() {
 function authView(su) {
   view = 'auth'; let year = 0;
   app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
-    (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3,4,5].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
+    (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
     <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
@@ -259,7 +259,7 @@ async function homeView() {
   subs = s || [];
   if (!me.is_admin) return blocksView(me.year);   // الطالب يشوف فرقته بس
   const cnt = y => subs.filter(x => x.year === y).length;
-  app.innerHTML = topBar() + '<h2>اختار الفرقة</h2>' + [1, 2, 3, 4, 5].map(y =>
+  app.innerHTML = topBar() + '<h2>اختار الفرقة</h2>' + [1, 2, 3].map(y =>
     '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>الفرقة ' + y + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
     '<br><small>' + (cnt(y) ? cnt(y) + ' مادة' : 'قريباً') + '</small></button>').join('');
   bindTop();
