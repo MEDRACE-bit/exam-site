@@ -223,7 +223,7 @@ const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام')
 const solvedIn = a => a.filter(m => answered[m.id]).length;
 const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
-const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curBlock ? esc(curBlock) : '', curSub ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
+const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curBlock ? esc(curBlock) : '', curSub && curSub.name !== curBlock ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
 const loading = () => { app.innerHTML = topBar() + '<p style="padding:24px;text-align:center">جاري التحميل...</p>'; bindTop() };
 
 async function fetchAll(mk) {
@@ -270,10 +270,13 @@ function blocksView(y) {
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
-    html += '<button class="sub blk" data-n="' + n + '"><b>' + esc(b) + '</b><br><small>' + c + ' مادة</small></button>';
+    html += '<button class="sub blk" data-n="' + n + '"><b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
-  document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => subjectsView(y, blocks[+btn.dataset.n]));
+  document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
+    const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
+    if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
+  });
 }
 
 // 3) subjects of a block
@@ -287,6 +290,8 @@ function subjectsView(y, block) {
   document.querySelectorAll('.sub').forEach(b => b.onclick = () => lecturesView(subs.find(x => x.id === +b.dataset.id)));
 }
 
+const backFromLec = () => subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? blocksView(curYear) : subjectsView(curYear);
+
 // 4) lectures of a subject (a lecture = the "chapter" column)
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
@@ -297,7 +302,7 @@ async function lecturesView(sub) {
       fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
       sb.from('bookmarks').select('question_id')
     ]);
-    if (m.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return subjectsView(curYear) }
+    if (m.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return backFromLec() }
     meta = m.data; answered = {};
     (a.data || []).forEach(x => answered[x.question_id] = x);
     saved = new Set((b.data || []).map(x => x.question_id));
@@ -310,7 +315,7 @@ async function lecturesView(sub) {
     return '<button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' +
       (w ? ' <small style="color:#e88">· ❌ ' + w + ' خطأ</small>' : '') + bar(solvedIn(arr), arr.length) + '</button>';
   };
-  let html = topBar() + crumb() + '<button class="link" id="bk">‹ المواد</button><h2>' + esc(sub.name) + '</h2>';
+  let html = topBar() + crumb() + '<button class="link" id="bk">' + (subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + '</button><h2>' + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
   else {
     const nw = meta.filter(isWrong).length;
@@ -318,7 +323,7 @@ async function lecturesView(sub) {
     html += card(LEC_ALL, 'كل المحاضرات', meta);
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
-  app.innerHTML = html; bindTop(); on('#bk', () => subjectsView(curYear)); on('#mk', mistakesView);
+  app.innerHTML = html; bindTop(); on('#bk', backFromLec); on('#mk', mistakesView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
 }
 
