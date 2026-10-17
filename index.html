@@ -314,7 +314,7 @@ async function lecturesView(sub) {
     const nw = meta.filter(isWrong).length;
     if (nw) html += '<button class="btn" id="mk">❌ أخطائي (' + nw + ') - مقسمة على المحاضرات</button>';
     html += card(LEC_ALL, 'كل المحاضرات', meta);
-    Object.keys(groups).forEach(k => { html += card(k, lecName(k), groups[k]) });
+    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups
   }
   app.innerHTML = html; bindTop(); on('#bk', () => subjectsView(curYear)); on('#mk', mistakesView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
