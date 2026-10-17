@@ -16,6 +16,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
 .link{background:none;border:0;color:#e88;padding:6px}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
+.rate{background:#2b2410;border:1px solid #6b5410;color:#ffd54a;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.9em;text-align:center}
 .coin{display:inline-block;width:1.15em;height:1.15em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f2b900 60%,#b98300);border:2px solid #ffd54a;box-shadow:inset 0 0 0 2px #c99400;vertical-align:-.2em;margin-left:4px;position:relative}
 .coin:after{content:'C';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 .7em/1 Arial,sans-serif;color:#7a5200}
 .top,.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -163,7 +164,7 @@ function pick(sel, cb) {
     b.classList.add('on'); cb(b.dataset.v);
   });
 }
-const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance} COIN</button><button class="link" id="lo">خروج</button></span></div>`;
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div><div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div>`;
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
@@ -172,7 +173,7 @@ function bindTop() {
 
 function authView(su) {
   view = 'auth'; let year = 0;
-  app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
+  app.innerHTML = `<div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div><div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3,4,5].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
@@ -450,7 +451,7 @@ async function adminView() {
     ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
     ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — فرقة ${esc(r.year)}<br>
       <span dir="ltr">${esc(r.phone)}</span><br>
-      <b>${esc(r.amount)} COIN</b> — ${esc(r.method)}<br>
+      <b>${esc(r.amount)}</b> <i class="coin"></i> — ${esc(r.method)}<br>
       <small>${esc(r.note || '')}</small><br>
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
@@ -470,14 +471,14 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance} COIN</h2>
+  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
     ${forced ? '<p class="msg">رصيدك خلص، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
     <button class="link" id="rf">تحديث الرصيد</button><button class="link" id="bk">رجوع</button></div>` +
-    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} COIN — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
+    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
   bindTop(); pick('#am', v => amt = +v);
   on('#sd', async () => {
     const {error} = await sb.from('topup_requests').insert({user_id: me.id, amount: amt, method: $('#mt').value, proof_note: $('#pf').value.trim()});
