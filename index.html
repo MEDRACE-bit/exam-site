@@ -423,7 +423,7 @@ function quizView() {
       mark(k, data.correct_index);
     });
   } else {
-    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
+    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none;white-space:pre-wrap;line-height:1.8" dir="auto"></div>';
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
