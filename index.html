@@ -175,7 +175,7 @@ function bindTop() {
 function authView(su) {
   view = 'auth'; let year = 0;
   app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
-    (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => `<button data-v="${y}">فرقة ${y}</button>`).join('')}</div>` : '') +
+    (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => `<button data-v="${y}">فرقة ${y}${BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : ''}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
     <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
@@ -227,7 +227,9 @@ const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام')
 const solvedIn = a => a.filter(m => answered[m.id]).length;
 const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
-const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curBlock ? esc(curBlock) : '', curSub && curSub.name !== curBlock ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
+const BATCH = {1: 38, 2: 37, 3: 36};
+const yName = y => 'الفرقة ' + y + (BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : '');
+const crumb = () => '<div class="crumb">' + [curYear ? yName(curYear) : '', curBlock ? esc(curBlock) : '', curSub && curSub.name !== curBlock ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
 const loading = () => { app.innerHTML = topBar() + '<p style="padding:24px;text-align:center">جاري التحميل...</p>'; bindTop() };
 
 async function fetchAll(mk) {
@@ -260,7 +262,7 @@ async function homeView() {
   if (!me.is_admin) return blocksView(me.year);   // الطالب يشوف فرقته بس
   const cnt = y => subs.filter(x => x.year === y).length;
   app.innerHTML = topBar() + '<h2>اختار الفرقة</h2>' + [1, 2, 3].map(y =>
-    '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>الفرقة ' + y + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
+    '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>' + yName(y) + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
     '<br><small>' + (cnt(y) ? cnt(y) + ' مادة' : 'قريباً') + '</small></button>').join('');
   bindTop();
   document.querySelectorAll('.sub').forEach(b => b.onclick = () => blocksView(+b.dataset.y));
@@ -296,7 +298,7 @@ function blocksView(y) {
     const o = BLOCK_ORDER[y] || [], ia = o.indexOf(a), ib = o.indexOf(b);
     return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
   });
-  let html = topBar() + crumb() + (me.is_admin ? '<button class="link" id="bk">‹ الفرق</button>' : '') + '<h2>الفرقة ' + y + ' - اختار البلوك</h2>';
+  let html = topBar() + crumb() + (me.is_admin ? '<button class="link" id="bk">‹ الفرق</button>' : '') + '<h2>' + yName(y) + ' - اختار البلوك</h2>';
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
@@ -475,7 +477,7 @@ async function adminView() {
   const rows = Array.isArray(list) ? list : [];
   app.innerHTML = topBar() + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
     ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
-    ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — فرقة ${esc(r.year)}<br>
+    ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — ${yName(+r.year)}<br>
       <span dir="ltr">${esc(r.phone)}</span><br>
       <b>${esc(r.amount)}</b> <i class="coin"></i> — ${esc(r.method)}<br>
       <small>${esc(r.note || '')}</small><br>
