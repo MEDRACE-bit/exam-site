@@ -57,7 +57,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g, '');
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {};
-let subs = [], meta = [], metaFor = null, curYear = 0, curSub = null, curLec = null;
+let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 let retry = new Set(), reviewing = false;
 
 // ==MINI-CLIENT-START==
@@ -221,7 +221,7 @@ const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام')
 const solvedIn = a => a.filter(m => answered[m.id]).length;
 const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
-const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curSub ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
+const crumb = () => '<div class="crumb">' + [curYear ? 'الفرقة ' + curYear : '', curBlock ? esc(curBlock) : '', curSub ? esc(curSub.name) : '', curLec !== null ? esc(lecName(curLec)) : ''].filter(Boolean).join(' › ') + '</div>';
 const loading = () => { app.innerHTML = topBar() + '<p style="padding:24px;text-align:center">جاري التحميل...</p>'; bindTop() };
 
 async function fetchAll(mk) {
@@ -248,7 +248,7 @@ async function fetchByIds(ids) {
 
 // 1) years
 async function homeView() {
-  view = 'home'; curYear = 0; curSub = null; curLec = null;
+  view = 'home'; curYear = 0; curBlock = null; curSub = null; curLec = null;
   const {data: s} = await sb.from('subjects').select('*').order('year').order('block').order('name');
   subs = s || [];
   const cnt = y => subs.filter(x => x.year === y).length;
@@ -256,25 +256,36 @@ async function homeView() {
     '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>الفرقة ' + y + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
     '<br><small>' + (cnt(y) ? cnt(y) + ' مادة' : 'قريباً') + '</small></button>').join('');
   bindTop();
-  document.querySelectorAll('.sub').forEach(b => b.onclick = () => subjectsView(+b.dataset.y));
+  document.querySelectorAll('.sub').forEach(b => b.onclick = () => blocksView(+b.dataset.y));
 }
 
-// 2) subjects of a year, grouped by block
-function subjectsView(y) {
-  view = 'subjects'; curYear = y; curSub = null; curLec = null;
+// 2) blocks of a year
+function blocksView(y) {
+  view = 'blocks'; curYear = y; curBlock = null; curSub = null; curLec = null;
   const list = subs.filter(x => x.year === y);
-  let html = topBar() + crumb() + '<button class="link" id="bk">‹ الفرق</button><h2>مواد الفرقة ' + y + '</h2>';
-  if (!list.length) html += '<p>لسه مفيش مواد</p>';
-  let last = null;
-  list.forEach(x => {
-    if (x.block !== last) { html += '<h3>' + esc(x.block) + '</h3>'; last = x.block }
-    html += '<button class="sub" data-id="' + x.id + '"><b>' + esc(x.name) + '</b></button>';
+  const blocks = [...new Set(list.map(x => x.block))];
+  let html = topBar() + crumb() + '<button class="link" id="bk">‹ الفرق</button><h2>الفرقة ' + y + ' - اختار البلوك</h2>';
+  if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
+  blocks.forEach((b, n) => {
+    const c = list.filter(x => x.block === b).length;
+    html += '<button class="sub blk" data-n="' + n + '"><b>' + esc(b) + '</b><br><small>' + c + ' مادة</small></button>';
   });
-  app.innerHTML = html; bindTop(); on('#bk', () => sectionsView());
+  app.innerHTML = html; bindTop(); on('#bk', () => homeView());
+  document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => subjectsView(y, blocks[+btn.dataset.n]));
+}
+
+// 3) subjects of a block
+function subjectsView(y, block) {
+  view = 'subjects'; curYear = y; if (block !== undefined) curBlock = block; curSub = null; curLec = null;
+  const list = subs.filter(x => x.year === y && x.block === curBlock);
+  let html = topBar() + crumb() + '<button class="link" id="bk">‹ البلوكات</button><h2>' + esc(curBlock) + '</h2>';
+  if (!list.length) html += '<p>لسه مفيش مواد</p>';
+  list.forEach(x => { html += '<button class="sub" data-id="' + x.id + '"><b>' + esc(x.name) + '</b></button>' });
+  app.innerHTML = html; bindTop(); on('#bk', () => blocksView(curYear));
   document.querySelectorAll('.sub').forEach(b => b.onclick = () => lecturesView(subs.find(x => x.id === +b.dataset.id)));
 }
 
-// 3) lectures of a subject (a lecture = the "chapter" column)
+// 4) lectures of a subject (a lecture = the "chapter" column)
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
   if (metaFor !== sub.id) {
@@ -309,7 +320,7 @@ async function lecturesView(sub) {
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
 }
 
-// 4) question sections of a lecture: all / important / by source / by type
+// 5) question sections of a lecture: all / important / by source / by type
 function sectionsView(k) {
   if (k === undefined) k = curLec;
   view = 'sections'; curLec = k;
@@ -349,7 +360,7 @@ function mistakesView() {
   document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
 }
 
-// 5) load the chosen section and start the quiz
+// 6) load the chosen section and start the quiz
 async function startQuiz(f) {
   loading();
   const scope = curLec === LEC_ALL ? meta : meta.filter(q => chOf(q) === curLec);
