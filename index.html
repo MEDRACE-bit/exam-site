@@ -16,6 +16,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
 .link{background:none;border:0;color:#e88;padding:6px}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
+.coin{display:inline-block;width:1.15em;height:1.15em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f2b900 60%,#b98300);border:2px solid #ffd54a;box-shadow:inset 0 0 0 2px #c99400;vertical-align:-.2em;margin-left:4px;position:relative}
+.coin:after{content:'C';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 .7em/1 Arial,sans-serif;color:#7a5200}
 .top,.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .sub,.ch{display:block;width:100%;text-align:start;padding:14px;margin:8px 0;border-radius:12px;border:1px solid #3a1c1c;background:#241212}
 .ch{background:#1b0d0d;padding:12px;margin:6px 0}
@@ -161,7 +163,7 @@ function pick(sel, cb) {
     b.classList.add('on'); cb(b.dataset.v);
   });
 }
-const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl">💳 ${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance} COIN</button><button class="link" id="lo">خروج</button></span></div>`;
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
@@ -253,6 +255,7 @@ async function homeView() {
   view = 'home'; curYear = 0; curBlock = null; curSub = null; curLec = null;
   const {data: s} = await sb.from('subjects').select('*').order('year').order('block').order('name');
   subs = s || [];
+  if (!me.is_admin) return blocksView(me.year);   // الطالب يشوف فرقته بس
   const cnt = y => subs.filter(x => x.year === y).length;
   app.innerHTML = topBar() + '<h2>اختار الفرقة</h2>' + [1, 2, 3, 4, 5].map(y =>
     '<button class="sub' + (y === me.year ? ' mine' : '') + '" data-y="' + y + '"><b>الفرقة ' + y + '</b>' + (y === me.year ? ' <small>(فرقتك)</small>' : '') +
@@ -266,7 +269,7 @@ function blocksView(y) {
   view = 'blocks'; curYear = y; curBlock = null; curSub = null; curLec = null;
   const list = subs.filter(x => x.year === y);
   const blocks = [...new Set(list.map(x => x.block))];
-  let html = topBar() + crumb() + '<button class="link" id="bk">‹ الفرق</button><h2>الفرقة ' + y + ' - اختار البلوك</h2>';
+  let html = topBar() + crumb() + (me.is_admin ? '<button class="link" id="bk">‹ الفرق</button>' : '') + '<h2>الفرقة ' + y + ' - اختار البلوك</h2>';
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
@@ -447,7 +450,7 @@ async function adminView() {
     ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
     ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — فرقة ${esc(r.year)}<br>
       <span dir="ltr">${esc(r.phone)}</span><br>
-      <b>${esc(r.amount)} ج</b> — ${esc(r.method)}<br>
+      <b>${esc(r.amount)} COIN</b> — ${esc(r.method)}<br>
       <small>${esc(r.note || '')}</small><br>
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
@@ -467,14 +470,14 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: ${me.balance} جنيه</h2>
+  app.innerHTML = topBar() + `<div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance} COIN</h2>
     ${forced ? '<p class="msg">رصيدك خلص، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
     <button class="link" id="rf">تحديث الرصيد</button><button class="link" id="bk">رجوع</button></div>` +
-    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} ج — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
+    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} COIN — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
   bindTop(); pick('#am', v => amt = +v);
   on('#sd', async () => {
     const {error} = await sb.from('topup_requests').insert({user_id: me.id, amount: amt, method: $('#mt').value, proof_note: $('#pf').value.trim()});
