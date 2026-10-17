@@ -13,6 +13,7 @@ input,textarea,select{width:100%;box-sizing:border-box;padding:12px;margin:6px 0
 button{font:inherit;color:inherit;cursor:pointer}
 .btn{width:100%;padding:12px;border:0;border-radius:10px;background:#c0262d;font-weight:700;margin-top:6px}
 .btn:disabled{opacity:.5}
+.btn.ok{background:#1f7a3d}.btn.no{background:#555}
 .link{background:none;border:0;color:#e88;padding:6px}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
 .top,.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -160,8 +161,9 @@ function pick(sel, cb) {
     b.classList.add('on'); cb(b.dataset.v);
   });
 }
-const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span><button class="pill" id="wl">💳 ${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl">💳 ${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
 function bindTop() {
+  on('#ad', () => adminView());
   on('#wl', () => walletView());
   on('#lo', async () => { await sb.auth.signOut(); authView(false) });
 }
@@ -423,13 +425,38 @@ function quizView() {
       mark(k, data.correct_index);
     });
   } else {
-    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none;white-space:pre-wrap;line-height:1.8" dir="auto"></div>';
+    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
       $('#mo').style.display = 'block'; $('#mo').textContent = data || 'مفيش إجابة نموذجية';
     });
   }
+}
+
+async function adminView() {
+  view = 'admin';
+  const {data: list, error} = await sb.rpc('admin_list_topups');
+  const rows = Array.isArray(list) ? list : [];
+  app.innerHTML = topBar() + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
+    ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
+    ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — فرقة ${esc(r.year)}<br>
+      <span dir="ltr">${esc(r.phone)}</span><br>
+      <b>${esc(r.amount)} ج</b> — ${esc(r.method)}<br>
+      <small>${esc(r.note || '')}</small><br>
+      <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
+      <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
+    <button class="link" id="rf2">تحديث</button><button class="link" id="bk2">رجوع</button></div>`;
+  bindTop();
+  on('#rf2', adminView); on('#bk2', enter);
+  document.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
+    const ap = b.dataset.a === 'approve';
+    if (!confirm(ap ? 'تأكيد قبول الطلب وإضافة الرصيد؟' : 'تأكيد رفض الطلب؟')) return;
+    b.disabled = true;
+    const {data, error} = await sb.rpc(ap ? 'approve_topup' : 'reject_topup', {req_id: +b.dataset.id});
+    if (error || !data || !data.ok) alert('الطلب اتعالج قبل كده أو حصلت مشكلة');
+    adminView();
+  });
 }
 
 async function walletView(forced) {
