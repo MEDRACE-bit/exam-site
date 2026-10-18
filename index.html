@@ -118,6 +118,7 @@ function makeClient(url, key) {
   }
   return {
     from: t => new Q(t),
+    fn: async (n, body) => { await ensure(); return read(await fetch(url + '/functions/v1/' + n, { method: 'POST', headers: headers(), body: JSON.stringify(body || {}) })) },
     rpc: (n, args) => call('/rest/v1/rpc/' + n, { method: 'POST', headers: headers(), body: JSON.stringify(args || {}) }),
     auth: {
       getSession: async () => { await ensure(); return { data: { session: sess } } },
@@ -284,12 +285,14 @@ const ICONS = {
   histo: '<svg viewBox="0 0 32 32"><g fill="#f4a7c0" stroke="#c2547f" stroke-width="1"><circle cx="9" cy="10" r="5"/><circle cx="20" cy="9" r="5"/><circle cx="14" cy="19" r="5"/><circle cx="24" cy="20" r="5"/><circle cx="6" cy="22" r="4"/></g><g fill="#7b2d8e"><circle cx="9" cy="10" r="1.8"/><circle cx="20" cy="9" r="1.8"/><circle cx="14" cy="19" r="1.8"/><circle cx="24" cy="20" r="1.8"/><circle cx="6" cy="22" r="1.5"/></g></svg>',
   biochem: '<svg viewBox="0 0 32 32"><g transform="rotate(25 16 16)"><path d="M12 3h8v2h-1v16a4 4 0 0 1-8 0V5h-1z" fill="#ffffff22" stroke="#cfd8dc" stroke-width="1.2"/><path d="M12.6 14h6.8v7a3.4 3.4 0 0 1-6.8 0z" fill="#39d353"/><circle cx="15" cy="17" r=".9" fill="#b8ffc6"/><circle cx="17.5" cy="19.5" r=".7" fill="#b8ffc6"/></g></svg>',
   termin: '<svg viewBox="0 0 32 32"><rect x="6" y="4" width="20" height="24" rx="2" fill="#3b6fd8"/><rect x="9" y="4" width="2" height="24" fill="#2a54a8"/><path d="M19 12v8M15 16h8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  renal: '<svg viewBox="0 0 32 32"><path d="M20 4c-6-1.5-12 1.5-13 8-.8 5.500 2 8 3.500 10.500 1.200 2 .500 4.500 3.500 5.500 4.500 1.500 9-2.500 9.500-8C24 15 25 8 20 4z" fill="#b5483a" stroke="#7d2c22" stroke-width="1"/><path d="M13 13c3 0 4.500 2 3.500 4-.8 1.600-3 1.800-4.500 1" fill="none" stroke="#e8a090" stroke-width="1.800" stroke-linecap="round"/><path d="M12 18.500c-3 .5-5 2-5.500 4" fill="none" stroke="#7d2c22" stroke-width="1.500" stroke-linecap="round"/></svg>',
+  resp: '<svg viewBox="0 0 32 32"><path d="M15 3h2v9l-1 2-1-2z" fill="#cfd8dc" stroke="#90a4ae" stroke-width=".8"/><path d="M14 13C10 12 5 15 4.500 21c-.3 4 1.500 7 4.500 7 3.500 0 5-2 5-5z" fill="#f48fb1" stroke="#c2185b" stroke-width="1"/><path d="M18 13c4-1 9 2 9.500 8 .3 4-1.500 7-4.500 7-3.500 0-5-2-5-5z" fill="#f48fb1" stroke="#c2185b" stroke-width="1"/><path d="M16 12l-4 5M16 12l4 5" stroke="#90a4ae" stroke-width="1.200" stroke-linecap="round"/></svg>',
   cns: '<svg viewBox="0 0 32 32"><path d="M11 6a5 5 0 0 0-5 5 4.5 4.5 0 0 0-1.5 7A5 5 0 0 0 10 26h2V6zM21 6a5 5 0 0 1 5 5 4.5 4.5 0 0 1 1.5 7A5 5 0 0 1 22 26h-2V6z" fill="#f48fb1" stroke="#c2185b" stroke-width="1"/><path d="M16 6v20" stroke="#c2185b"/></svg>'
 };
 function icon(name) {
   const n = String(name || '').toLowerCase();
   const k = /anat/.test(n) ? 'anat' : /embry/.test(n) ? 'embry' : /physio/.test(n) ? 'physio' : /histo/.test(n) ? 'histo' :
-    /biochem/.test(n) ? 'biochem' : /terminolog/.test(n) ? 'termin' : /^cns$/.test(n.trim()) ? 'cns' : '';
+    /biochem/.test(n) ? 'biochem' : /terminolog/.test(n) ? 'termin' : /^cns$/.test(n.trim()) ? 'cns' : /renal/.test(n) ? 'renal' : /^resp/.test(n.trim()) ? 'resp' : '';
   return k ? '<span class="ic">' + ICONS[k] + '</span>' : '';
 }
 
@@ -463,7 +466,24 @@ function quizView() {
       mark(k, data.correct_index);
     });
   } else {
-    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv">إظهار الإجابة</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
+    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="ai">🤖 صحّح إجابتي بالذكاء الاصطناعي</button><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="ag" class="card" style="display:none" dir="auto"></div><div id="mo" class="card" style="display:none" dir="auto"></div>';
+    on('#ai', async () => {
+      const t = $('#wa').value.trim();
+      if (t.length < 3) return alert('اكتب إجابتك الأول');
+      const b = $('#ai'), g = $('#ag'); b.disabled = true; b.textContent = 'بيتم التصحيح...';
+      const {data, error} = await sb.fn('grade-written', {qid: q.id, answer: t});
+      b.disabled = false; b.textContent = '🤖 صحّح إجابتي بالذكاء الاصطناعي';
+      g.style.display = 'block';
+      if (error || !data || data.error || data.score === undefined) {
+        const st = error && error.status;
+        g.textContent = st === 429 ? 'خلصت تصحيحات النهاردة، جرّب بكرة' : st === 403 ? 'لازم حسابك يكون مفعّل ومدفوع النهاردة' : 'حصلت مشكلة في التصحيح، جرّب تاني';
+        return;
+      }
+      const li = (h, a) => a.length ? '<b>' + h + '</b><ul>' + a.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '';
+      g.innerHTML = '<h3 style="margin:0 0 6px">' + data.score + ' / 10</h3>' + bar(data.score, 10) + '<p>' + esc(data.comment) + '</p>' +
+        li('✅ غطّيته', data.covered) + li('⚠️ ناقص', data.missing) + li('❌ غلط', data.wrong) +
+        '<small style="opacity:.6">تصحيح آلي تقريبي، قارنه بالإجابة النموذجية</small>';
+    });
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
