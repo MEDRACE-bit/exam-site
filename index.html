@@ -226,6 +226,8 @@ function blockedView(r) {
 }
 
 const LEC_ALL = '__all__';
+// محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
+const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
@@ -372,7 +374,7 @@ function sectionsView(k) {
   const wr = arr.filter(isWrong);
   if (wr.length) secs.push({t: '❌ أخطائي', f: {wrong: 1}, a: wr, plain: 1});
   const key = arr.filter(q => q.is_key_point);
-  if (key.length) secs.push({t: '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
+  if (key.length) secs.push({t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
   Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   if (new Set(arr.map(q => q.type)).size > 1) ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t);
