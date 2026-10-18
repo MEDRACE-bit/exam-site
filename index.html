@@ -18,6 +18,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
 .link{background:none;border:0;color:#e88;padding:6px}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
+.tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
 .rate{background:#2b2410;border:1px solid #6b5410;color:#ffd54a;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.9em;text-align:center}
 .coin{display:inline-block;width:1.15em;height:1.15em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f2b900 60%,#b98300);border:2px solid #ffd54a;box-shadow:inset 0 0 0 2px #c99400;vertical-align:-.2em;margin-left:4px;position:relative}
 .coin:after{content:'C';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 .7em/1 Arial,sans-serif;color:#7a5200}
@@ -169,10 +170,31 @@ function pick(sel, cb) {
     b.classList.add('on'); cb(b.dataset.v);
   });
 }
-const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>`;
+let accessUntil = 0, expiredFired = false;
+const unlocked = () => !!(me && me.is_admin) || accessUntil > Date.now();
+const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
+const accessBar = () => (me && me.is_admin) ? '' : accessUntil > Date.now()
+  ? '<div class="tbar">⏱ الأسئلة مفتوحة، المتبقي: <b id="tm">' + fmtT(accessUntil - Date.now()) + '</b></div>'
+  : '<div class="tbar lock">🔒 الأسئلة مقفولة <button class="btn" id="bu">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button></div>';
+setInterval(() => {
+  const e = $('#tm'); if (e) e.textContent = fmtT(accessUntil - Date.now());
+  if (accessUntil && accessUntil <= Date.now() && !expiredFired && me && !me.is_admin && view !== 'auth' && view !== 'blocked') {
+    expiredFired = true; alert('خلصت الـ 24 ساعة، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
+  }
+}, 1000);
+async function buyAccess() {
+  if (!confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
+  const {data: r, error} = await sb.rpc('buy_access');
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) return r.reason === 'no_balance' ? (me.balance = r.balance, walletView(true)) : blockedView(r.reason);
+  me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
+  curSub && view === 'lectures' ? lecturesView(curSub) : enter();
+}
+const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>` + accessBar();
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
+  on('#bu', buyAccess);
   on('#lo', async () => { if (!confirm('متأكد إنك عايز تخرج من حسابك؟')) return; await sb.auth.signOut(); authView(false) });
 }
 
@@ -209,9 +231,9 @@ async function enter() {
   const {data: p} = await sb.from('profiles').select('*').single();
   if (!p) return authView(false);
   me = p;
-  const {data: r} = await sb.rpc('charge_daily');
-  if (!r || !r.ok) return r && r.reason === 'no_balance' ? (me.balance = r.balance, walletView(true)) : blockedView(r && r.reason);
-  me.balance = r.balance;
+  const {data: r} = await sb.rpc('my_access');
+  if (!r || !r.ok) return blockedView(r && r.reason);
+  me.balance = r.balance; accessUntil = r.remaining > 0 ? Date.now() + r.remaining * 1000 : 0; expiredFired = false;
   homeView();
 }
 
@@ -227,7 +249,7 @@ function blockedView(r) {
 
 const LEC_ALL = '__all__';
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
-const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates']);
+const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
@@ -335,6 +357,17 @@ const backFromLec = () => subs.filter(x => x.year === curYear && x.block === cur
 // 4) lectures of a subject (a lecture = the "chapter" column)
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
+  if (!unlocked()) {
+    loading();
+    const {data: ls, error: le} = await sb.rpc('list_lectures', {sid: sub.id});
+    metaFor = null;
+    let h = topBar() + crumb() + '<button class="link" id="bk">' + (subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + '</button><h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
+    if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
+    else if (!(ls || []).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
+    else (ls || []).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
+    app.innerHTML = h; bindTop(); on('#bk', backFromLec);
+    return;
+  }
   if (metaFor !== sub.id) {
     loading();
     const [m, a, b] = await Promise.all([
@@ -522,8 +555,8 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + `<div class="rate"><i class="coin"></i>كل يوم استخدام للموقع = <b>1</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
-    ${forced ? '<p class="msg">رصيدك خلص، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
+  app.innerHTML = topBar() + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
+    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
