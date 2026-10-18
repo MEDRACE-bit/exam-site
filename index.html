@@ -34,6 +34,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pb{height:4px;background:#3a1c1c;border-radius:4px;margin-top:8px}
 .pb i{display:block;height:100%;background:#c0262d;border-radius:4px}
 .crumb{color:#a88;font-size:13px;margin:8px 0}
+.lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}.wbox{flex:0 0 64px;margin:8px 0;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}.wbox.off{opacity:.35;border-color:#3a1c1c}.wbox b{font-size:16px}
 .sub.mine{border-color:#c0262d}
 h3{margin:16px 0 4px;color:#e88}
 </style>
@@ -346,19 +347,17 @@ async function lecturesView(sub) {
   meta.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
   const card = (k, t, arr) => {
     const w = arr.filter(isWrong).length;
-    return '<button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' +
-      (w ? ' <small style="color:#e88">· ❌ ' + w + ' خطأ</small>' : '') + bar(solvedIn(arr), arr.length) + '</button>';
+    return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button>' +
+      '<button class="wbox' + (w ? '' : ' off') + '" data-k="' + esc(k) + '" data-w="' + w + '" title="أخطائي"><span>❌</span><b>' + w + '</b></button></div>';
   };
   let html = topBar() + crumb() + '<button class="link" id="bk">' + (subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + '</button><h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
   else {
-    const nw = meta.filter(isWrong).length;
-    if (nw) html += '<button class="btn" id="mk">❌ أخطائي (' + nw + ') - مقسمة على المحاضرات</button>';
-    html += card(LEC_ALL, 'كل المحاضرات', meta);
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
-  app.innerHTML = html; bindTop(); on('#bk', backFromLec); on('#mk', mistakesView);
+  app.innerHTML = html; bindTop(); on('#bk', backFromLec);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
+  document.querySelectorAll('.wbox').forEach(b => b.onclick = () => { if (+b.dataset.w) { curLec = b.dataset.k; startQuiz({wrong: 1}) } });
 }
 
 // 5) question sections of a lecture: all / important / by source / by type
