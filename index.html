@@ -17,6 +17,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ic{display:inline-block;width:30px;height:30px;vertical-align:middle;margin-inline-end:10px}.ic svg{width:100%;height:100%;display:block}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
 .link{background:none;border:0;color:#e88;padding:6px}
+.back{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #c0262d;color:#ffd0d0;border-radius:14px;padding:8px 18px;margin:8px 0;font:inherit;font-weight:700;cursor:pointer}.back:active{background:#3a1c1c}.bar .back{margin:0}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
 .tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
 .note{background:#10202b;border:1px solid #1f5f7a;color:#a8dcf5;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:.92em;line-height:1.7}.note a{color:#ffd54a;font-weight:700;text-decoration:underline}
@@ -191,6 +192,7 @@ async function buyAccess() {
   me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
   curSub && view === 'lectures' ? lecturesView(curSub) : enter();
 }
+const BK = t => '<button class="back" id="bk">' + t + '</button>';
 const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>` + accessBar();
 function bindTop() {
   on('#ad', () => adminView());
@@ -329,7 +331,7 @@ function blocksView(y) {
     const o = BLOCK_ORDER[y] || [], ia = o.indexOf(a), ib = o.indexOf(b);
     return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
   });
-  let html = topBar() + crumb() + (me.is_admin ? '<button class="link" id="bk">‹ الفرق</button>' : '') + '<h2>' + yName(y) + ' - اختار البلوك</h2>';
+  let html = topBar() + (me.is_admin ? BK('‹ الفرق') : '') + crumb() + '<h2>' + yName(y) + ' - اختار البلوك</h2>';
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
@@ -346,7 +348,7 @@ function blocksView(y) {
 function subjectsView(y, block) {
   view = 'subjects'; curYear = y; if (block !== undefined) curBlock = block; curSub = null; curLec = null;
   const list = subs.filter(x => x.year === y && x.block === curBlock);
-  let html = topBar() + crumb() + '<button class="link" id="bk">‹ البلوكات</button><h2>' + esc(curBlock) + '</h2>';
+  let html = topBar() + BK('‹ البلوكات') + crumb() + '<h2>' + esc(curBlock) + '</h2>';
   if (!list.length) html += '<p>لسه مفيش مواد</p>';
   list.forEach(x => { html += '<button class="sub" data-id="' + x.id + '">' + icon(x.name) + '<b>' + esc(x.name) + '</b></button>' });
   app.innerHTML = html; bindTop(); on('#bk', () => blocksView(curYear));
@@ -362,7 +364,7 @@ async function lecturesView(sub) {
     loading();
     const {data: ls, error: le} = await sb.rpc('list_lectures', {sid: sub.id});
     metaFor = null;
-    let h = topBar() + crumb() + '<button class="link" id="bk">' + (subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + '</button><h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
+    let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
     else (ls || []).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
@@ -389,7 +391,7 @@ async function lecturesView(sub) {
     return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button>' +
       '<button class="wbox' + (w ? '' : ' off') + '" data-k="' + esc(k) + '" data-w="' + w + '" title="أخطائي"><span>❌</span><b>' + w + '</b></button></div>';
   };
-  let html = topBar() + crumb() + '<button class="link" id="bk">' + (subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + '</button><h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
+  let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
   else {
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
@@ -414,7 +416,7 @@ function sectionsView(k) {
     const a2 = arr.filter(q => q.type === t);
     if (a2.length) secs.push({t: t === 'mcq' ? 'اختيار من متعدد' : 'مقالي', f: {type: t}, a: a2});
   });
-  app.innerHTML = topBar() + crumb() + '<button class="link" id="bk">‹ المحاضرات</button><h2>' + esc(lecName(k)) + '</h2>' +
+  app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
       : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + ' سؤال</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
@@ -429,7 +431,7 @@ function mistakesView() {
   meta.filter(isWrong).forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
   const total = meta.filter(isWrong).length;
   const btn = (k, t, n) => '<button class="sub mk" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + n + ' سؤال للمراجعة</small></button>';
-  let html = topBar() + crumb() + '<button class="link" id="bk">‹ المحاضرات</button><h2>❌ أخطائي</h2>';
+  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>❌ أخطائي</h2>';
   if (!total) html += '<p>مفيش أخطاء، تمام!</p>';
   else {
     html += btn(LEC_ALL, 'مراجعة كل الأخطاء', total);
@@ -471,11 +473,11 @@ function go(d) { i = Math.max(0, Math.min(qs.length - 1, i + d)); quizView() }
 function quizView() {
   view = 'quiz'; const q = qs[i];
   if (!q) {
-    app.innerHTML = topBar() + '<div class="card">مفيش أسئلة في المادة دي لسه</div><button class="btn" id="bk">رجوع</button>';
+    app.innerHTML = topBar() + BK('‹ رجوع') + '<div class="card">مفيش أسئلة في المادة دي لسه</div>';
     bindTop(); on('#bk', () => sectionsView()); return;
   }
   const a = retry.has(q.id) ? null : answered[q.id];
-  app.innerHTML = topBar() + `<div class="bar"><button class="link" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="link" id="st">${saved.has(q.id) ? '★' : '☆'}</button></div>
+  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="link" id="st">${saved.has(q.id) ? '★' : '☆'}</button></div>
     <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
     <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>`;
@@ -532,7 +534,7 @@ async function adminView() {
   view = 'admin';
   const {data: list, error} = await sb.rpc('admin_list_topups');
   const rows = Array.isArray(list) ? list : [];
-  app.innerHTML = topBar() + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
+  app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
     ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
     ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — ${yName(+r.year)}<br>
       <span dir="ltr">${esc(r.phone)}</span><br>
@@ -540,7 +542,7 @@ async function adminView() {
       <small>${esc(r.note || '')}</small><br>
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
-    <button class="link" id="rf2">تحديث</button><button class="link" id="bk2">رجوع</button></div>`;
+    <button class="link" id="rf2">تحديث</button></div>`;
   bindTop();
   on('#rf2', adminView); on('#bk2', enter);
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
@@ -556,14 +558,14 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
+  app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
     ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
     <div class="note">⏱ في حالة تأخر الشحن عن 5 دقائق، يرجى إرسال سكرين الدفع على بوت الدعم الفني على تليجرام: <a href="https://t.me/MEDRACESU" target="_blank" rel="noopener" dir="ltr">@MEDRACESU</a></div>
-    <button class="link" id="rf">تحديث الرصيد</button><button class="link" id="bk">رجوع</button></div>` +
+    <button class="link" id="rf">تحديث الرصيد</button></div>` +
     (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
   bindTop(); pick('#am', v => amt = +v);
   on('#sd', async () => {
