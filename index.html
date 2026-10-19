@@ -504,24 +504,7 @@ function quizView() {
       mark(k, data.correct_index);
     });
   } else {
-    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="ai">🤖 صحّح إجابتي بالذكاء الاصطناعي</button><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="ag" class="card" style="display:none" dir="auto"></div><div id="mo" class="card" style="display:none" dir="auto"></div>';
-    on('#ai', async () => {
-      const t = $('#wa').value.trim();
-      if (t.length < 3) return alert('اكتب إجابتك الأول');
-      const b = $('#ai'), g = $('#ag'); b.disabled = true; b.textContent = 'بيتم التصحيح...';
-      const {data, error} = await sb.fn('grade-written', {qid: q.id, answer: t});
-      b.disabled = false; b.textContent = '🤖 صحّح إجابتي بالذكاء الاصطناعي';
-      g.style.display = 'block';
-      if (error || !data || data.error || data.score === undefined) {
-        const st = error && error.status;
-        g.textContent = st === 429 ? 'خلصت تصحيحات النهاردة، جرّب بكرة' : st === 403 ? 'لازم حسابك يكون مفعّل ومدفوع النهاردة' : 'حصلت مشكلة في التصحيح، جرّب تاني';
-        return;
-      }
-      const li = (h, a) => a.length ? '<b>' + h + '</b><ul>' + a.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '';
-      g.innerHTML = '<h3 style="margin:0 0 6px">' + data.score + ' / 10</h3>' + bar(data.score, 10) + '<p>' + esc(data.comment) + '</p>' +
-        li('✅ غطّيته', data.covered) + li('⚠️ ناقص', data.missing) + li('❌ غلط', data.wrong) +
-        '<small style="opacity:.6">تصحيح آلي تقريبي، قارنه بالإجابة النموذجية</small>';
-    });
+    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
