@@ -34,6 +34,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .row .on{background:#c0262d;border-color:#c0262d}
 .msg{color:#e88;min-height:1.2em}
 .q{font-size:18px;line-height:1.7}
+.ml{margin:6px 0;line-height:1.8}.ml.pt{margin-inline-start:6px}.svb{color:#fff;background:#241212;border:1px solid #c0262d;border-radius:10px;padding:8px 12px}.svh{margin:14px 0 4px;color:#e88;font-weight:700}.svs{margin:8px 0 2px;color:#aaa;font-size:13px}.sqi{display:block;width:100%;text-align:start;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d;line-height:1.6}
 .pb{height:4px;background:#3a1c1c;border-radius:4px;margin-top:8px}
 .pb i{display:block;height:100%;background:#c0262d;border-radius:4px}
 .crumb{color:#a88;font-size:13px;margin:8px 0}
@@ -67,7 +68,7 @@ const on = (s, f) => { const e = $(s); if (e) e.onclick = f };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g, '');
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
-let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {};
+let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 let retry = new Set(), reviewing = false;
 
@@ -394,9 +395,11 @@ async function lecturesView(sub) {
   let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
   else {
+    html += '<button class="sub" id="svb"><b>🔖 المحفوظات</b><br><small>' + meta.filter(q => saved.has(q.id)).length + ' سؤال محفوظ</small></button>';
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
   app.innerHTML = html; bindTop(); on('#bk', backFromLec);
+  on('#svb', savedView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
   document.querySelectorAll('.wbox').forEach(b => b.onclick = () => { if (+b.dataset.w) { curLec = b.dataset.k; startQuiz({wrong: 1}) } });
 }
@@ -441,6 +444,50 @@ function mistakesView() {
   document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
 }
 
+// ترتيب الإجابة النموذجية: كل نقطة في سطر لوحدها
+function fmtModel(t) {
+  if (!t) return 'مفيش إجابة نموذجية';
+  let s = String(t).replace(/\r/g, '').trim();
+  s = s.replace(/([.:;!?\)\]])[ \t]+(?=(?:\d{1,2}[\)\.]|[A-Za-z]\))[ \t])/g, '$1\n');
+  s = s.replace(/([^\n])[ \t]+(?=•[ \t])/g, '$1\n');
+  s = s.replace(/([.:;])[ \t]+(?=[-–][ \t])/g, '$1\n');
+  return s.split(/\n+/).map(l => l.trim()).filter(Boolean).map(l =>
+    '<div class="ml' + (/^(\d{1,2}[\)\.]|[A-Za-z]\)|[-•–])\s/.test(l) ? ' pt' : '') + '">' + esc(l) + '</div>').join('');
+}
+
+// المحفوظات: مرتبة حسب المحاضرة، وجوّا كل محاضرة الاختياري الأول وبعده المقالي
+async function savedView() {
+  view = 'saved'; curLec = null; fromSaved = false;
+  loading();
+  const ids = meta.filter(q => saved.has(q.id)).map(q => q.id);
+  const res = ids.length ? await fetchByIds(ids) : {data: [], error: null};
+  if (res.error) { alert('حصلت مشكلة، حاول تاني'); return lecturesView(curSub) }
+  const groups = {};
+  res.data.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
+  const order = [];
+  Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => {
+    ['mcq', 'written'].forEach(t => groups[k].filter(q => q.type === t).forEach(q => order.push(q)));
+  });
+  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>🔖 المحفوظات</h2>';
+  if (!order.length) html += '<p>لسه ماحفظتش أي سؤال. دوس "☆ حفظ" جوّا أي سؤال.</p>';
+  else {
+    let n = 0;
+    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => {
+      html += '<div class="svh">📚 ' + esc(lecName(k)) + ' (' + groups[k].length + ')</div>';
+      [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].forEach(([t, tn]) => {
+        const a = groups[k].filter(q => q.type === t);
+        if (!a.length) return;
+        html += '<div class="svs">' + tn + ' (' + a.length + ')</div>';
+        a.forEach(q => { html += '<button class="sqi" data-n="' + (n++) + '" dir="auto">' + esc(q.body.length > 140 ? q.body.slice(0, 140) + '...' : q.body) + '</button>' });
+      });
+    });
+  }
+  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
+  document.querySelectorAll('.sqi').forEach(b => b.onclick = () => {
+    qs = order; retry = new Set(); reviewing = false; fromSaved = true; i = +b.dataset.n; quizView();
+  });
+}
+
 // 6) load the chosen section and start the quiz
 async function startQuiz(f) {
   loading();
@@ -462,7 +509,7 @@ async function startQuiz(f) {
     });
   }
   if (res.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return sectionsView() }
-  qs = res.data; reviewing = !!f.wrong;
+  qs = res.data; reviewing = !!f.wrong; fromSaved = false;
   const first = qs.findIndex(x => !answered[x.id]);
   i = (f.wrong || first < 0) ? 0 : first;
   quizView();
@@ -477,15 +524,15 @@ function quizView() {
     bindTop(); on('#bk', () => sectionsView()); return;
   }
   const a = retry.has(q.id) ? null : answered[q.id];
-  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="link" id="st">${saved.has(q.id) ? '★' : '☆'}</button></div>
+  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
     <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
     <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>`;
-  bindTop(); on('#bk', () => sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  bindTop(); on('#bk', () => fromSaved ? savedView() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
-    $('#st').textContent = saved.has(q.id) ? '★' : '☆';
+    $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ';
   });
   const box = $('#ans');
   if (q.type === 'mcq') {
@@ -508,7 +555,7 @@ function quizView() {
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
-      $('#mo').style.display = 'block'; $('#mo').textContent = data || 'مفيش إجابة نموذجية';
+      $('#mo').style.display = 'block'; $('#mo').innerHTML = fmtModel(data);
     });
   }
 }
