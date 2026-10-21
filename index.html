@@ -447,7 +447,21 @@ function sectionsView(k) {
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
       : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + ' سؤال</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
   bindTop(); on('#bk', () => lecturesView(curSub));
-  document.querySelectorAll('.sec').forEach(b => b.onclick = () => startQuiz(secs[+b.dataset.n].f));
+  document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
+    const sc = secs[+b.dataset.n];
+    if (sc.f.key && new Set(sc.a.map(q => q.type)).size > 1) return keyTypesView(sc);
+    startQuiz(sc.f);
+  });
+}
+
+// المهم: لو فيه اختياري ومقالي يخيّره الأول
+function keyTypesView(sc) {
+  view = 'keytypes';
+  const ts = [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].map(([t, n]) => ({t, n, a: sc.a.filter(q => q.type === t)})).filter(x => x.a.length);
+  app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
+    ts.map((x, n) => '<button class="sub kty" data-n="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
+  bindTop(); on('#bk', () => sectionsView());
+  document.querySelectorAll('.kty').forEach(b => b.onclick = () => startQuiz({key: 1, type: ts[+b.dataset.n].t}));
 }
 
 // my mistakes, divided by lecture
