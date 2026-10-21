@@ -652,11 +652,11 @@ function setWM(off) {
 (function () {
   let t;
   const hide = ms => { document.body.classList.add('hid'); clearTimeout(t); if (ms) t = setTimeout(show, ms) };
-  const show = () => { if (!document.hidden && document.hasFocus()) document.body.classList.remove('hid') };
+  const show = () => { if (!document.hidden) document.body.classList.remove('hid') };
   const typing = e => e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
   document.addEventListener('visibilitychange', () => document.hidden ? hide() : show());
-  window.addEventListener('blur', () => { if (view !== 'auth') hide() });
   window.addEventListener('focus', show);
+  window.addEventListener('pageshow', show);
   document.addEventListener('keydown', e => {
     const k = (e.key || '').toLowerCase();
     if (k === 'printscreen' || k === 'meta' && e.shiftKey || (e.metaKey && e.shiftKey && /[345]/.test(k))) {
