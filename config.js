@@ -2,6 +2,6 @@
 window.APP_CONFIG = {
   url: "https://ckdumaoivcymzkhddezg.supabase.co",
   key: "sb_publishable_EWDmsuM_ga7MrZeNDHpd4Q_vreRM5QZ",
-  payInfo: "حوّل المبلغ على رقم: 01069149002 (فودافون كاش /انستاباي ) ثم اكتب رقم العملية.",
+  payInfo: "حوّل المبلغ على رقم: 01069149002 (فودافون كاش:محمود م ) ثم ارسل ايصال التحويل اليتا عبر تيلجرام.",
   support: "@MEDRACESU"
 };
