@@ -41,6 +41,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 .lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}.wbox{flex:0 0 64px;margin:8px 0;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}.wbox.off{opacity:.35;border-color:#3a1c1c}.wbox b{font-size:16px}
 .sub.mine{border-color:#c0262d}
 h3{margin:16px 0 4px;color:#e88}
+
+.sub30{margin:12px 0;padding:12px;border:1px solid #c0262d;border-radius:12px;background:#1b0d0d;line-height:1.8}
+.sub30 .btn{margin-top:8px}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+img{-webkit-user-drag:none;pointer-events:none}
+#wm{position:fixed;inset:0;z-index:99999;pointer-events:none}
+body.hid #app{filter:blur(40px);pointer-events:none}
+body.hid::after{content:'🔒 المحتوى محمي';position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0d0606;color:#fff;font-size:20px;z-index:100000}
+@media print{body{display:none!important}}
 </style>
 </head>
 <body>
@@ -175,23 +185,34 @@ function pick(sel, cb) {
 }
 let accessUntil = 0, expiredFired = false;
 const unlocked = () => !!(me && me.is_admin) || accessUntil > Date.now();
-const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
+const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
 const accessBar = () => (me && me.is_admin) ? '' : accessUntil > Date.now()
   ? '<div class="tbar">⏱ الأسئلة مفتوحة، المتبقي: <b id="tm">' + fmtT(accessUntil - Date.now()) + '</b></div>'
-  : '<div class="tbar lock">🔒 الأسئلة مقفولة <button class="btn" id="bu">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button></div>';
+  : '<div class="tbar lock">🔒 الأسئلة مقفولة <button class="btn" id="bu">🔓 افتح 24 ساعة بـ 3 <i class="coin"></i></button></div>';
 setInterval(() => {
   const e = $('#tm'); if (e) e.textContent = fmtT(accessUntil - Date.now());
   if (accessUntil && accessUntil <= Date.now() && !expiredFired && me && !me.is_admin && view !== 'auth' && view !== 'blocked') {
-    expiredFired = true; alert('خلصت الـ 24 ساعة، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
+    expiredFired = true; alert('الاشتراك خلص، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
   }
 }, 1000);
 async function buyAccess() {
-  if (!confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
+  if (!confirm('هيتخصم 3 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
   const {data: r, error} = await sb.rpc('buy_access');
   if (error || !r) return alert('حصلت مشكلة، حاول تاني');
   if (!r.ok) return r.reason === 'no_balance' ? (me.balance = r.balance, walletView(true)) : blockedView(r.reason);
   me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
   curSub && view === 'lectures' ? lecturesView(curSub) : enter();
+}
+async function buy30() {
+  if (!confirm('هيتخصم 60 coin من رصيدك وتفتح الأسئلة 30 يوم. متأكد؟')) return;
+  const {data: r, error} = await sb.rpc('buy_access_30d');
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) {
+    if (r.reason === 'no_balance') { me.balance = r.balance; return alert('رصيدك مش كفاية لاشتراك 30 يوم، اشحن الأول.') }
+    return blockedView(r.reason);
+  }
+  me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
+  alert('تم تفعيل اشتراك 30 يوم ✅'); enter();
 }
 const BK = t => '<button class="back" id="bk">' + t + '</button>';
 const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>` + accessBar();
@@ -203,7 +224,7 @@ function bindTop() {
 }
 
 function authView(su) {
-  view = 'auth'; let year = 0;
+  view = 'auth'; setWM(true); let year = 0;
   app.innerHTML = `<div class="card"><h2>${su ? 'حساب جديد' : 'تسجيل الدخول'}</h2>` +
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => `<button data-v="${y}">فرقة ${y}${BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : ''}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
@@ -226,6 +247,7 @@ function authView(su) {
       }
       const {error} = await sb.auth.signInWithPassword({email: p + '@exam.local', password: w});
       if (error) return m('الرقم أو كلمة السر غلط');
+      await sb.rpc('claim_session');
       enter();
     } finally { if ($('#go')) $('#go').disabled = false }
   });
@@ -234,7 +256,7 @@ function authView(su) {
 async function enter() {
   const {data: p} = await sb.from('profiles').select('*').single();
   if (!p) return authView(false);
-  me = p;
+  me = p; setWM();
   const {data: r} = await sb.rpc('my_access');
   if (!r || !r.ok) return blockedView(r && r.reason);
   me.balance = r.balance; accessUntil = r.remaining > 0 ? Date.now() + r.remaining * 1000 : 0; expiredFired = false;
@@ -242,6 +264,7 @@ async function enter() {
 }
 
 function blockedView(r) {
+  if (r === 'other_device') { alert('الحساب ده اتفتح من جهاز تاني، فاتسجّل خروجك من الجهاز ده. الحساب يشتغل على جهاز واحد بس في نفس الوقت.'); setWM(true); sb.auth.signOut().then(() => authView(false)); return }
   view = 'blocked';
   const pend = r === 'pending';
   app.innerHTML = `<div class="card"><h2>${pend ? '⏳ حسابك قيد المراجعة' : '⛔ الحساب موقوف'}</h2>
@@ -593,8 +616,8 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 30;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
-    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<p>${PAY_INFO}</p>
+  app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>3</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
+    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم بـ 60 <i class="coin"></i></small><button class="btn" id="b30">اشترك 30 يوم بـ 60 <i class="coin"></i></button></div><p>${PAY_INFO}</p>
     <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
@@ -607,7 +630,7 @@ async function walletView(forced) {
     const {error} = await sb.from('topup_requests').insert({user_id: me.id, amount: amt, method: $('#mt').value, proof_note: $('#pf').value.trim()});
     $('#m').textContent = error ? 'حصلت مشكلة، حاول تاني' : 'تم إرسال الطلب، هيتراجع ويتضاف الرصيد';
   });
-  on('#rf', enter); on('#bk', enter);
+  on('#b30', buy30); on('#rf', enter); on('#bk', enter);
 }
 
 document.onkeydown = e => {
@@ -616,6 +639,41 @@ document.onkeydown = e => {
   else if (e.key === 'ArrowRight') go(-1);
   else if (/^[1-5]$/.test(e.key)) { const b = document.querySelectorAll('.ch')[+e.key - 1]; if (b) b.click() }
 };
+
+// ===== حماية المحتوى (ردع: مفيش طريقة تمنع تصوير الشاشة 100% من المتصفح) =====
+function setWM(off) {
+  let w = document.getElementById('wm');
+  if (off || !me) { if (w) w.remove(); return }
+  if (!w) { w = document.createElement('div'); w.id = 'wm'; document.body.appendChild(w) }
+  const t = esc((me.phone || me.name || '') + '');
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="170"><text x="20" y="100" transform="rotate(-24 140 85)" fill="rgba(255,255,255,0.13)" font-size="17" font-family="Arial">' + t + '</text></svg>';
+  w.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+}
+(function () {
+  let t;
+  const hide = ms => { document.body.classList.add('hid'); clearTimeout(t); if (ms) t = setTimeout(show, ms) };
+  const show = () => { if (!document.hidden && document.hasFocus()) document.body.classList.remove('hid') };
+  const typing = e => e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
+  document.addEventListener('visibilitychange', () => document.hidden ? hide() : show());
+  window.addEventListener('blur', () => { if (view !== 'auth') hide() });
+  window.addEventListener('focus', show);
+  document.addEventListener('keydown', e => {
+    const k = (e.key || '').toLowerCase();
+    if (k === 'printscreen' || k === 'meta' && e.shiftKey || (e.metaKey && e.shiftKey && /[345]/.test(k))) {
+      hide(2500); try { navigator.clipboard.writeText('') } catch (x) {}
+    }
+    if ((e.ctrlKey || e.metaKey) && ['p', 's', 'u'].includes(k) || (e.ctrlKey || e.metaKey) && e.shiftKey && ['s', 'i', 'c', 'j'].includes(k) || k === 'f12') e.preventDefault();
+  }, true);
+  document.addEventListener('keyup', e => { if ((e.key || '').toLowerCase() === 'printscreen') { hide(2500); try { navigator.clipboard.writeText('') } catch (x) {} } }, true);
+  ['contextmenu', 'copy', 'cut', 'dragstart', 'selectstart'].forEach(ev => document.addEventListener(ev, e => { if (!typing(e)) e.preventDefault() }, true));
+  window.addEventListener('beforeprint', () => hide());
+  // جهاز واحد بس: كل 25 ثانية نتأكد إن الجلسة لسه هي الفعّالة
+  setInterval(async () => {
+    if (!me || me.is_admin || view === 'auth' || view === 'blocked' || document.hidden) return;
+    const {data: r} = await sb.rpc('my_access');
+    if (r && !r.ok && r.reason === 'other_device') blockedView('other_device');
+  }, 25000);
+})();
 </script>
 </body>
 </html>
