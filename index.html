@@ -614,11 +614,11 @@ async function adminView() {
 }
 
 async function walletView(forced) {
-  view = 'wallet'; let amt = 30;
+  view = 'wallet'; let amt = 60;
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>3</b> <i class="coin"></i></div><div class="card"><h2>رصيدك: <i class="coin"></i>${me.balance}</h2>
     ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم بـ 60 <i class="coin"></i></small><button class="btn" id="b30">اشترك 30 يوم بـ 60 <i class="coin"></i></button></div><p>${PAY_INFO}</p>
-    <div class="row" id="am">${[10, 30, 50, 100].map(a => `<button data-v="${a}" class="${a === 30 ? 'on' : ''}">${a}</button>`).join('')}</div>
+    <div class="row" id="am">${[10, 20, 60, 100].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
