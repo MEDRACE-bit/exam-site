@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>بنك الأسئلة ✓v5</title>
+<title>بنك الأسئلة ✓v6</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 body{margin:0;background:#140a0a;color:#f4eaea;font:16px Cairo,system-ui,sans-serif}
@@ -442,11 +442,9 @@ async function lecturesView(sub) {
   let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
   else {
-    html += '<button class="sub" id="svb"><b>🔖 المحفوظات</b><br><small>' + meta.filter(q => saved.has(q.id)).length + ' سؤال محفوظ</small></button>';
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
   app.innerHTML = html; bindTop(); on('#bk', backFromLec);
-  on('#svb', savedView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
 }
 
@@ -456,6 +454,8 @@ function sectionsView(k) {
   view = 'sections'; curLec = k;
   const arr = k === LEC_ALL ? meta : meta.filter(q => chOf(q) === k);
   const secs = [{t: 'كل الأسئلة', f: {}, a: arr}];
+  const mySaved = arr.filter(q => saved.has(q.id));
+  if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
   const key = arr.filter(q => q.is_key_point);
   if (key.length) secs.push({t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
   Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
@@ -466,10 +466,11 @@ function sectionsView(k) {
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
-      : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + ' سؤال</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
+      : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + (s.saved ? ' سؤال محفوظ' : ' سؤال') + '</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
   bindTop(); on('#bk', () => lecturesView(curSub));
   document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
     const sc = secs[+b.dataset.n];
+    if (sc.saved) return savedTypes(k);
     if (sc.f.key && new Set(sc.a.map(q => q.type)).size > 1) return keyTypesView(sc);
     startQuiz(sc.f);
   });
@@ -496,33 +497,16 @@ function fmtModel(t) {
     '<div class="ml' + (/^(\d{1,2}[\)\.]|[A-Za-z]\)|[-•–])\s/.test(l) ? ' pt' : '') + '">' + esc(l) + '</div>').join('');
 }
 
-// المحفوظات: 1) اختيار المحاضرة  2) اختياري / مقالي (لو موجود)  3) الحل زي الطبيعي
-function savedView() {
-  view = 'saved'; curLec = null; fromSaved = false; savedLec = null;
-  const mine = meta.filter(q => saved.has(q.id));
-  const groups = {};
-  mine.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
-  const ks = Object.keys(groups).sort((x, y) => x.localeCompare(y, 'ar', {numeric: true}));
-  const btn = (k, t, a) => '<button class="sub svl" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(a) + ' / ' + a.length + ' سؤال محفوظ</small>' + bar(solvedIn(a), a.length) + '</button>';
-  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>🔖 المحفوظات</h2>';
-  if (!mine.length) html += '<p>لسه ماحفظتش أي سؤال. دوس "☆ حفظ" جوّا أي سؤال.</p>';
-  else {
-    if (ks.length > 1) html += btn(LEC_ALL, 'كل المحاضرات', mine);
-    ks.forEach(k => { html += btn(k, lecName(k), groups[k]) });
-  }
-  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
-  document.querySelectorAll('.svl').forEach(b => b.onclick = () => savedTypes(b.dataset.k));
-}
-
+// المحفوظات بتتفتح من جوه كل محاضرة (اختياري / مقالي لو موجود) وبعدين الحل زي الطبيعي
 function savedTypes(k) {
   if (k === undefined) k = savedLec;
   view = 'savedtypes'; savedLec = k; fromSaved = false;
   const mine = meta.filter(q => saved.has(q.id) && (k === LEC_ALL || chOf(q) === k));
   const secs = [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
-  app.innerHTML = topBar() + BK('‹ المحفوظات') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
+  app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
     secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
-  bindTop(); on('#bk', savedView);
+  bindTop(); on('#bk', () => sectionsView(k));
   document.querySelectorAll('.svt').forEach(b => b.onclick = async () => {
     loading();
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
