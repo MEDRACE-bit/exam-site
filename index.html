@@ -256,9 +256,15 @@ function authView(su) {
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => y === 2 ? `<button type="button" class="soon" disabled>فرقة 2<br><small>قريبًا</small></button>` : `<button data-v="${y}">فرقة ${y}${BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : ''}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
-    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
+    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button>
+    ${su ? '' : '<button class="link" id="fp" type="button">هل نسيت كلمة السر؟</button><p class="pay-info" id="fpm" style="display:none"></p>'}</div>`;
   if (su) pick('#yr', v => year = +v);
   on('#sw', () => authView(!su));
+  on('#fp', () => {
+    const f = $('#fpm');
+    f.innerHTML = linkTG('تواصل معانا على @MEDRACESU واكتبلنا اسمك ورقم التليفون اللي عملت بيه الحساب.');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  });
   on('#go', async () => {
     const m = t => { $('#m').textContent = t }, p = toEn($('#p').value), w = $('#w').value;
     $('#go').disabled = true;
