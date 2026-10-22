@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>بنك الأسئلة ✓v2</title>
+<title>بنك الأسئلة ✓v3</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 body{margin:0;background:#140a0a;color:#f4eaea;font:16px Cairo,system-ui,sans-serif}
@@ -597,9 +597,13 @@ function quizView() {
   app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}${practice ? ' · صح ' + Object.values(roundAns).filter(x => x.is_correct).length + ' من ' + Object.keys(roundAns).length : ''}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
     <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${practice ? '🔄 إعادة الحل · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>${reviewing ? '' : '<button class="link rbox" id="rs">🔄 حل من الأول</button>'}`;
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">${reviewing ? '🔄 إعادة المراجعة من الأول' : '🔄 حل من الأول'}</button>`;
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
-  on('#rs', () => { if (!confirm('تبدأ الأسئلة من الأول؟ أخطاءك وتقدمك الحالي هيفضلوا محفوظين.')) return; practice = true; roundAns = {}; retry = new Set(); i = 0; quizView() });
+  on('#rs', () => {
+    if (reviewing) { if (!confirm('تعيد مراجعة الأخطاء من الأول؟')) return; practice = false; roundAns = {}; retry = new Set(qs.map(x => x.id)); i = 0; return quizView() }
+    if (!confirm('تبدأ الأسئلة من الأول؟ أخطاءك وتقدمك الحالي هيفضلوا محفوظين.')) return;
+    practice = true; roundAns = {}; retry = new Set(); i = 0; quizView();
+  });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
