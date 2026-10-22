@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>بنك الأسئلة ✓v3</title>
+<title>بنك الأسئلة ✓v4</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 body{margin:0;background:#140a0a;color:#f4eaea;font:16px Cairo,system-ui,sans-serif}
@@ -82,7 +82,7 @@ const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.inde
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
-let retry = new Set(), reviewing = false, practice = false, roundAns = {};
+let retry = new Set(), reviewing = false, practice = false, roundAns = {}, roundKey = null;
 
 function accMsg(e) {
   const st = e && e.status;
@@ -308,7 +308,7 @@ const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
-const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
+const isWrong = m => { const a = answered[m.id]; return !!a && (a.mistake_override != null ? !!a.mistake_override : a.is_correct === false) };
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
 const BATCH = {1: 38, 2: 37, 3: 36};
 const yName = y => 'الفرقة ' + y + (BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : '');
@@ -427,7 +427,7 @@ async function lecturesView(sub) {
     loading();
     const [m, a, b] = await Promise.all([
       fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
-      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
+      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct,mistake_override').order('question_id')).then(r => r.error ? fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')) : r),
       sb.from('bookmarks').select('question_id')
     ]);
     if (m.error) { alert(accMsg(m.error)); return backFromLec() }
@@ -552,9 +552,9 @@ function savedTypes(k) {
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
-    retry = new Set(); reviewing = false; fromSaved = true; practice = false; roundAns = {};
+    retry = new Set(); reviewing = false; fromSaved = true; practice = false; roundAns = {}; roundKey = ['s', k, secs[+b.dataset.k].t].join('|');
     const first = qs.findIndex(x => !answered[x.id]);
-    i = first < 0 ? 0 : first; quizView();
+    i = first < 0 ? 0 : first; resumeRound(); quizView();
   });
 }
 
@@ -580,9 +580,23 @@ async function startQuiz(f) {
   }
   if (res.error) { alert(accMsg(res.error)); return sectionsView() }
   qs = res.data; reviewing = !!f.wrong; fromSaved = false; practice = false; roundAns = {};
+  roundKey = f.wrong ? null : ['q', curSub.id, curLec, JSON.stringify(f)].join('|');
   const first = qs.findIndex(x => !answered[x.id]);
   i = (f.wrong || first < 0) ? 0 : first;
-  quizView();
+  resumeRound(); quizView();
+}
+
+// حفظ جولة "حل من الأول" على الجهاز: لو خرجت ورجعت تكمل من نفس المكان
+const rkey = () => roundKey && me ? 'rnd:' + me.id + ':' + roundKey : null;
+function saveRound() { const k = rkey(); if (k && practice) ls.set(k, JSON.stringify({a: roundAns, i})) }
+function clearRound() { const k = rkey(); if (k) ls.del(k) }
+function resumeRound() {
+  const k = rkey(); if (!k) return;
+  try {
+    const r = JSON.parse(ls.get(k) || 'null');
+    if (r && r.a && qs.some(x => !r.a[x.id])) { practice = true; roundAns = r.a; i = Math.max(0, Math.min(qs.length - 1, +r.i || 0)) }
+    else ls.del(k);
+  } catch (e) { ls.del(k) }
 }
 
 function go(d) { i = Math.max(0, Math.min(qs.length - 1, i + d)); quizView() }
@@ -594,21 +608,40 @@ function quizView() {
     bindTop(); on('#bk', () => sectionsView()); return;
   }
   const a = practice ? roundAns[q.id] : (retry.has(q.id) ? null : answered[q.id]);
-  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}${practice ? ' · صح ' + Object.values(roundAns).filter(x => x.is_correct).length + ' من ' + Object.keys(roundAns).length : ''}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
+  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
     <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${practice ? '🔄 إعادة الحل · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
-    <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">${reviewing ? '🔄 إعادة المراجعة من الأول' : '🔄 حل من الأول'}</button>`;
+    <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div><div id="mkw"></div></div>
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">${reviewing ? '🔄 إعادة المراجعة من الأول' : '🔄 حل من الأول'}</button>${practice ? '<button class="link rbox" id="ex">❎ إنهاء الإعادة</button>' : ''}`;
+  saveRound();
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
   on('#rs', () => {
     if (reviewing) { if (!confirm('تعيد مراجعة الأخطاء من الأول؟')) return; practice = false; roundAns = {}; retry = new Set(qs.map(x => x.id)); i = 0; return quizView() }
     if (!confirm('تبدأ الأسئلة من الأول؟ أخطاءك وتقدمك الحالي هيفضلوا محفوظين.')) return;
     practice = true; roundAns = {}; retry = new Set(); i = 0; quizView();
   });
+  on('#ex', () => {
+    if (!confirm('تنهي الإعادة وترجع للحل العادي؟ أخطاءك وتقدمك محفوظين.')) return;
+    clearRound(); practice = false; roundAns = {};
+    const f0 = qs.findIndex(x => !answered[x.id]); i = f0 < 0 ? 0 : f0; quizView();
+  });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
     $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ';
   });
+  // خانة أخطائي: شيل السؤال من أخطائي أو ضيفه (بعد ما تجاوبه)
+  const paintMk = () => {
+    const w = $('#mkw'); if (!w) return;
+    if (!answered[q.id]) { w.innerHTML = ''; return }
+    w.innerHTML = `<button class="link rbox" id="mk">${isWrong(q) ? '✅ شيل من أخطائي' : '❌ ضيف لأخطائي'}</button>`;
+    on('#mk', async () => {
+      const flag = !isWrong(q);
+      const {error} = await sb.rpc('set_mistake', {qid: q.id, flag});
+      if (error) return alert(accMsg(error));
+      answered[q.id].mistake_override = flag; paintMk();
+    });
+  };
+  paintMk();
   const box = $('#ans');
   if (q.type === 'mcq') {
     box.innerHTML = (q.choices || []).map((c, k) => `<button class="ch" data-k="${k}" dir="auto"><b>${'ABCDE'[k]}.</b> ${esc(c)}</button>`).join('');
@@ -626,9 +659,8 @@ function quizView() {
         roundAns[q.id] = {chosen_index: k, is_correct: data.is_correct};
         // الخطأ الجديد بيتسجل، لكن الإجابة الصح مبتمسحش خطأ قديم
         if (!answered[q.id] || (!data.is_correct && answered[q.id].is_correct)) answered[q.id] = {chosen_index: k, is_correct: data.is_correct};
-        const sp = document.querySelector('.bar span'); if (sp) sp.textContent = `${i + 1} / ${qs.length} · صح ${Object.values(roundAns).filter(x => x.is_correct).length} من ${Object.keys(roundAns).length}`;
       } else { answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id) }
-      mark(k, data.correct_index);
+      mark(k, data.correct_index); saveRound(); paintMk();
     });
   } else {
     box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
