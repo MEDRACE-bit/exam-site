@@ -83,6 +83,12 @@ let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = 
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 let retry = new Set(), reviewing = false;
 
+function accMsg(e) {
+  const st = e && e.status;
+  if (st === 0 || (e && e.message === 'network')) return 'مشكلة في الاتصال بالنت، جرّب تاني';
+  if (st === 401) return 'الجلسة خلصت، اعمل تسجيل دخول تاني';
+  return 'لازم حسابك يكون مفعّل ومدفوع النهاردة';
+}
 // ==MINI-CLIENT-START==
 function makeClient(url, key) {
   let sess = null;
@@ -98,17 +104,37 @@ function makeClient(url, key) {
     if (!r.ok) return { data: null, error: { message: (j && (j.message || j.msg || j.error_description || j.error)) || r.statusText, status: r.status } };
     return { data: j, error: null };
   };
+  let refreshing = null;
   const ensure = async () => {
     if (!sess || !sess.refresh_token || sess.expires_at - 60 > Date.now() / 1000) return;
-    const r = await fetch(url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: sess.refresh_token }) });
-    save(r.ok ? await r.json() : null);
+    if (!refreshing) refreshing = (async () => {
+      try {
+        const r = await fetch(url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: sess.refresh_token }) });
+        if (r.ok) save(await r.json());
+        else if (r.status === 400 || r.status === 401) { await new Promise(z => setTimeout(z, 700)); try { const cur = JSON.parse(ls.get('sbsess') || 'null'); if (cur && cur.expires_at - 60 > Date.now() / 1000) sess = cur; else save(null) } catch (e) { save(null) } }
+      } catch (e) { /* network blip: keep the session, try again on the next call */ }
+      finally { refreshing = null }
+    })();
+    await refreshing;
   };
   const headers = extra => {
     const h = Object.assign({ apikey: key, 'Content-Type': 'application/json' }, extra);
     if (sess) h.Authorization = 'Bearer ' + sess.access_token;
     return h;
   };
-  const call = async (path, opt) => { await ensure(); return read(await fetch(url + path, opt)) };
+  const call = async (path, opt) => {
+    await ensure();
+    const go = async () => {
+      try {
+        const ex = {}, oh = (opt && opt.headers) || {};
+        ['Prefer', 'Accept', 'Content-Profile'].forEach(k => { if (oh[k]) ex[k] = oh[k] });
+        return await read(await fetch(url + path, Object.assign({}, opt, { headers: headers(ex) })));
+      } catch (e) { return { data: null, error: { message: 'network', status: 0 } } }
+    };
+    let r = await go();
+    if (r.error && (r.error.status === 0 || r.error.status === 401)) { await new Promise(z => setTimeout(z, 600)); if (r.error.status === 401 && sess) { sess.expires_at = 0; await ensure() } r = await go() }
+    return r;
+  };
 
   class Q {
     constructor(t) { this.t = t; this.p = new URLSearchParams(); this.o = []; this.m = 'GET'; this.b = null; this.one = false }
@@ -403,7 +429,7 @@ async function lecturesView(sub) {
       fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
       sb.from('bookmarks').select('question_id')
     ]);
-    if (m.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return backFromLec() }
+    if (m.error) { alert(accMsg(m.error)); return backFromLec() }
     meta = m.data; answered = {};
     (a.data || []).forEach(x => answered[x.question_id] = x);
     saved = new Set((b.data || []).map(x => x.question_id));
@@ -551,7 +577,7 @@ async function startQuiz(f) {
       return q.order('id');
     });
   }
-  if (res.error) { alert('لازم حسابك يكون مفعّل ومدفوع النهاردة'); return sectionsView() }
+  if (res.error) { alert(accMsg(res.error)); return sectionsView() }
   qs = res.data; reviewing = !!f.wrong; fromSaved = false;
   const first = qs.findIndex(x => !answered[x.id]);
   i = (f.wrong || first < 0) ? 0 : first;
@@ -589,7 +615,7 @@ function quizView() {
     document.querySelectorAll('.ch').forEach(b => b.onclick = async () => {
       if (answered[q.id] && !retry.has(q.id)) return;
       const k = +b.dataset.k, {data, error} = await sb.rpc('submit_answer', {qid: q.id, idx: k});
-      if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
+      if (error) return alert(accMsg(error));
       answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id);
       mark(k, data.correct_index);
     });
@@ -597,7 +623,7 @@ function quizView() {
     box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
-      if (error) return alert('لازم حسابك يكون مفعّل ومدفوع النهاردة');
+      if (error) return alert(accMsg(error));
       $('#mo').style.display = 'block'; $('#mo').innerHTML = fmtModel(data);
     });
   }
