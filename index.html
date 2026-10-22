@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn:disabled{opacity:.5}
 .ic{display:inline-block;width:38px;height:38px;vertical-align:middle;margin-inline-end:10px}.ic svg,.ic img{width:100%;height:100%;display:block;object-fit:contain}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
-.link{background:none;border:0;color:#e88;padding:6px}
+.link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}
 .back{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #c0262d;color:#ffd0d0;border-radius:14px;padding:8px 18px;margin:8px 0;font:inherit;font-weight:700;cursor:pointer}.back:active{background:#3a1c1c}.bar .back{margin:0}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
 .tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
@@ -663,8 +663,7 @@ async function walletView(forced) {
     <select id="mt"><option>فودافون كاش</option><option>انستاباي</option></select>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
-    <div class="note">⏱ في حالة تأخر الشحن عن 5 دقائق، يرجى إرسال سكرين الدفع على بوت الدعم الفني على تليجرام: <a href="https://t.me/MEDRACESU" target="_blank" rel="noopener" dir="ltr">@MEDRACESU</a></div>
-    <button class="link" id="rf">تحديث الرصيد</button></div>` +
+    <button class="link rbox" id="rf">تحديث الرصيد</button></div>` +
     (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
   bindTop(); pick('#am', v => amt = +v);
   on('#sd', async () => {
