@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>بنك الأسئلة ✓v4</title>
+<title>بنك الأسئلة ✓v5</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 body{margin:0;background:#140a0a;color:#f4eaea;font:16px Cairo,system-ui,sans-serif}
@@ -38,7 +38,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pb{height:4px;background:#3a1c1c;border-radius:4px;margin-top:8px}
 .pb i{display:block;height:100%;background:#c0262d;border-radius:4px}
 .crumb{color:#a88;font-size:13px;margin:8px 0}
-.lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}.wbox{flex:0 0 64px;margin:8px 0;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}.wbox.off{opacity:.35;border-color:#3a1c1c}.wbox b{font-size:16px}
+.lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}
 .sub.mine{border-color:#c0262d}
 h3{margin:16px 0 4px;color:#e88}
 
@@ -82,7 +82,6 @@ const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.inde
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
-let retry = new Set(), reviewing = false, practice = false, roundAns = {}, roundKey = null;
 
 function accMsg(e) {
   const st = e && e.status;
@@ -308,7 +307,6 @@ const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
-const isWrong = m => { const a = answered[m.id]; return !!a && (a.mistake_override != null ? !!a.mistake_override : a.is_correct === false) };
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
 const BATCH = {1: 38, 2: 37, 3: 36};
 const yName = y => 'الفرقة ' + y + (BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : '');
@@ -427,7 +425,7 @@ async function lecturesView(sub) {
     loading();
     const [m, a, b] = await Promise.all([
       fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
-      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct,mistake_override').order('question_id')).then(r => r.error ? fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')) : r),
+      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
       sb.from('bookmarks').select('question_id')
     ]);
     if (m.error) { alert(accMsg(m.error)); return backFromLec() }
@@ -439,9 +437,7 @@ async function lecturesView(sub) {
   const groups = {};
   meta.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
   const card = (k, t, arr) => {
-    const w = arr.filter(isWrong).length;
-    return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button>' +
-      '<button class="wbox' + (w ? '' : ' off') + '" data-k="' + esc(k) + '" data-w="' + w + '" title="أخطائي"><span>❌</span><b>' + w + '</b></button></div>';
+    return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button></div>';
   };
   let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
   if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
@@ -452,7 +448,6 @@ async function lecturesView(sub) {
   app.innerHTML = html; bindTop(); on('#bk', backFromLec);
   on('#svb', savedView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
-  document.querySelectorAll('.wbox').forEach(b => b.onclick = () => { if (+b.dataset.w) { curLec = b.dataset.k; startQuiz({wrong: 1}) } });
 }
 
 // 5) question sections of a lecture: all / important / by source / by type
@@ -461,8 +456,6 @@ function sectionsView(k) {
   view = 'sections'; curLec = k;
   const arr = k === LEC_ALL ? meta : meta.filter(q => chOf(q) === k);
   const secs = [{t: 'كل الأسئلة', f: {}, a: arr}];
-  const wr = arr.filter(isWrong);
-  if (wr.length) secs.push({t: '❌ أخطائي', f: {wrong: 1}, a: wr, plain: 1});
   const key = arr.filter(q => q.is_key_point);
   if (key.length) secs.push({t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
   Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
@@ -490,23 +483,6 @@ function keyTypesView(sc) {
     ts.map((x, n) => '<button class="sub kty" data-n="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
   bindTop(); on('#bk', () => sectionsView());
   document.querySelectorAll('.kty').forEach(b => b.onclick = () => startQuiz({key: 1, type: ts[+b.dataset.n].t}));
-}
-
-// my mistakes, divided by lecture
-function mistakesView() {
-  view = 'mistakes'; curLec = null;
-  const groups = {};
-  meta.filter(isWrong).forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
-  const total = meta.filter(isWrong).length;
-  const btn = (k, t, n) => '<button class="sub mk" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + n + ' سؤال للمراجعة</small></button>';
-  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>❌ أخطائي</h2>';
-  if (!total) html += '<p>مفيش أخطاء، تمام!</p>';
-  else {
-    html += btn(LEC_ALL, 'مراجعة كل الأخطاء', total);
-    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += btn(k, lecName(k), groups[k].length) });
-  }
-  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
-  document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
 }
 
 // ترتيب الإجابة النموذجية: كل نقطة في سطر لوحدها
@@ -552,51 +528,28 @@ function savedTypes(k) {
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
-    retry = new Set(); reviewing = false; fromSaved = true; practice = false; roundAns = {}; roundKey = ['s', k, secs[+b.dataset.k].t].join('|');
+    fromSaved = true;
     const first = qs.findIndex(x => !answered[x.id]);
-    i = first < 0 ? 0 : first; resumeRound(); quizView();
+    i = first < 0 ? 0 : first; quizView();
   });
 }
 
 // 6) load the chosen section and start the quiz
 async function startQuiz(f) {
   loading();
-  const scope = curLec === LEC_ALL ? meta : meta.filter(q => chOf(q) === curLec);
-  let res;
-  if (f.wrong) {
-    const ids = scope.filter(isWrong).map(q => q.id);
-    retry = new Set(ids);
-    res = await fetchByIds(ids);
-  } else {
-    retry = new Set();
-    res = await fetchAll(() => {
-      let q = sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').eq('subject_id', curSub.id);
-      if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
-      if (f.key) q = q.eq('is_key_point', 'true');
-      if (f.src) q = q.eq('source_tag', f.src);
-      if (f.type) q = q.eq('type', f.type);
-      return q.order('id');
-    });
-  }
+  const res = await fetchAll(() => {
+    let q = sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').eq('subject_id', curSub.id);
+    if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
+    if (f.key) q = q.eq('is_key_point', 'true');
+    if (f.src) q = q.eq('source_tag', f.src);
+    if (f.type) q = q.eq('type', f.type);
+    return q.order('id');
+  });
   if (res.error) { alert(accMsg(res.error)); return sectionsView() }
-  qs = res.data; reviewing = !!f.wrong; fromSaved = false; practice = false; roundAns = {};
-  roundKey = f.wrong ? null : ['q', curSub.id, curLec, JSON.stringify(f)].join('|');
+  qs = res.data; fromSaved = false;
   const first = qs.findIndex(x => !answered[x.id]);
-  i = (f.wrong || first < 0) ? 0 : first;
-  resumeRound(); quizView();
-}
-
-// حفظ جولة "حل من الأول" على الجهاز: لو خرجت ورجعت تكمل من نفس المكان
-const rkey = () => roundKey && me ? 'rnd:' + me.id + ':' + roundKey : null;
-function saveRound() { const k = rkey(); if (k && practice) ls.set(k, JSON.stringify({a: roundAns, i})) }
-function clearRound() { const k = rkey(); if (k) ls.del(k) }
-function resumeRound() {
-  const k = rkey(); if (!k) return;
-  try {
-    const r = JSON.parse(ls.get(k) || 'null');
-    if (r && r.a && qs.some(x => !r.a[x.id])) { practice = true; roundAns = r.a; i = Math.max(0, Math.min(qs.length - 1, +r.i || 0)) }
-    else ls.del(k);
-  } catch (e) { ls.del(k) }
+  i = first < 0 ? 0 : first;
+  quizView();
 }
 
 function go(d) { i = Math.max(0, Math.min(qs.length - 1, i + d)); quizView() }
@@ -607,41 +560,25 @@ function quizView() {
     app.innerHTML = topBar() + BK('‹ رجوع') + '<div class="card">مفيش أسئلة في المادة دي لسه</div>';
     bindTop(); on('#bk', () => sectionsView()); return;
   }
-  const a = practice ? roundAns[q.id] : (retry.has(q.id) ? null : answered[q.id]);
+  const a = answered[q.id];
   app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
-    <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${practice ? '🔄 إعادة الحل · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
-    <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div><div id="mkw"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">${reviewing ? '🔄 إعادة المراجعة من الأول' : '🔄 حل من الأول'}</button>${practice ? '<button class="link rbox" id="ex">❎ إنهاء الإعادة</button>' : ''}`;
-  saveRound();
+    <div class="card"><small>${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
+    <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">🔄 حل من الأول</button>`;
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
-  on('#rs', () => {
-    if (reviewing) { if (!confirm('تعيد مراجعة الأخطاء من الأول؟')) return; practice = false; roundAns = {}; retry = new Set(qs.map(x => x.id)); i = 0; return quizView() }
-    if (!confirm('تبدأ الأسئلة من الأول؟ أخطاءك وتقدمك الحالي هيفضلوا محفوظين.')) return;
-    practice = true; roundAns = {}; retry = new Set(); i = 0; quizView();
-  });
-  on('#ex', () => {
-    if (!confirm('تنهي الإعادة وترجع للحل العادي؟ أخطاءك وتقدمك محفوظين.')) return;
-    clearRound(); practice = false; roundAns = {};
-    const f0 = qs.findIndex(x => !answered[x.id]); i = f0 < 0 ? 0 : f0; quizView();
+  on('#rs', async () => {
+    if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
+    const btn = $('#rs'); if (btn) btn.disabled = true;
+    const ids = qs.map(x => x.id);
+    const {error} = await sb.rpc('reset_progress', {qids: ids});
+    if (error) { if (btn) btn.disabled = false; return alert('حصلت مشكلة، حاول تاني') }
+    ids.forEach(id => { delete answered[id] }); i = 0; quizView();
   });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
     $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ';
   });
-  // خانة أخطائي: شيل السؤال من أخطائي أو ضيفه (بعد ما تجاوبه)
-  const paintMk = () => {
-    const w = $('#mkw'); if (!w) return;
-    if (!answered[q.id]) { w.innerHTML = ''; return }
-    w.innerHTML = `<button class="link rbox" id="mk">${isWrong(q) ? '✅ شيل من أخطائي' : '❌ ضيف لأخطائي'}</button>`;
-    on('#mk', async () => {
-      const flag = !isWrong(q);
-      const {error} = await sb.rpc('set_mistake', {qid: q.id, flag});
-      if (error) return alert(accMsg(error));
-      answered[q.id].mistake_override = flag; paintMk();
-    });
-  };
-  paintMk();
   const box = $('#ans');
   if (q.type === 'mcq') {
     box.innerHTML = (q.choices || []).map((c, k) => `<button class="ch" data-k="${k}" dir="auto"><b>${'ABCDE'[k]}.</b> ${esc(c)}</button>`).join('');
@@ -652,15 +589,11 @@ function quizView() {
     if (a) mark(a.chosen_index, a.is_correct ? a.chosen_index : -1);
     if (a && !a.is_correct) sb.rpc('get_answer_key', {qid: q.id}).then(r => { if (!r.error && r.data && qs[i] === q) mark(a.chosen_index, r.data.correct_index) });
     document.querySelectorAll('.ch').forEach(b => b.onclick = async () => {
-      if (practice ? roundAns[q.id] : (answered[q.id] && !retry.has(q.id))) return;
-      const k = +b.dataset.k, {data, error} = await sb.rpc(practice ? 'practice_answer' : 'submit_answer', {qid: q.id, idx: k});
+      if (answered[q.id]) return;
+      const k = +b.dataset.k, {data, error} = await sb.rpc('submit_answer', {qid: q.id, idx: k});
       if (error) return alert(accMsg(error));
-      if (practice) {
-        roundAns[q.id] = {chosen_index: k, is_correct: data.is_correct};
-        // الخطأ الجديد بيتسجل، لكن الإجابة الصح مبتمسحش خطأ قديم
-        if (!answered[q.id] || (!data.is_correct && answered[q.id].is_correct)) answered[q.id] = {chosen_index: k, is_correct: data.is_correct};
-      } else { answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id) }
-      mark(k, data.correct_index); saveRound(); paintMk();
+      answered[q.id] = {chosen_index: k, is_correct: data.is_correct};
+      mark(k, data.correct_index);
     });
   } else {
     box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
