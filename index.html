@@ -681,13 +681,9 @@ document.onkeydown = e => {
 };
 
 // ===== حماية المحتوى (ردع: مفيش طريقة تمنع تصوير الشاشة 100% من المتصفح) =====
-function setWM(off) {
-  let w = document.getElementById('wm');
-  if (off || !me) { if (w) w.remove(); return }
-  if (!w) { w = document.createElement('div'); w.id = 'wm'; document.body.appendChild(w) }
-  const t = esc((me.phone || me.name || '') + '');
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="170"><text x="20" y="100" transform="rotate(-24 140 85)" fill="rgba(255,255,255,0.13)" font-size="17" font-family="Arial">' + t + '</text></svg>';
-  w.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+function setWM() {
+  const w = document.getElementById('wm');
+  if (w) w.remove();
 }
 (function () {
   let t;
