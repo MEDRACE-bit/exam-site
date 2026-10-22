@@ -82,7 +82,7 @@ const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.inde
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
-let retry = new Set(), reviewing = false;
+let retry = new Set(), reviewing = false, practice = false, roundAns = {};
 
 function accMsg(e) {
   const st = e && e.status;
@@ -552,7 +552,7 @@ function savedTypes(k) {
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
-    retry = new Set(); reviewing = false; fromSaved = true;
+    retry = new Set(); reviewing = false; fromSaved = true; practice = false; roundAns = {};
     const first = qs.findIndex(x => !answered[x.id]);
     i = first < 0 ? 0 : first; quizView();
   });
@@ -579,7 +579,7 @@ async function startQuiz(f) {
     });
   }
   if (res.error) { alert(accMsg(res.error)); return sectionsView() }
-  qs = res.data; reviewing = !!f.wrong; fromSaved = false;
+  qs = res.data; reviewing = !!f.wrong; fromSaved = false; practice = false; roundAns = {};
   const first = qs.findIndex(x => !answered[x.id]);
   i = (f.wrong || first < 0) ? 0 : first;
   quizView();
@@ -593,12 +593,13 @@ function quizView() {
     app.innerHTML = topBar() + BK('‹ رجوع') + '<div class="card">مفيش أسئلة في المادة دي لسه</div>';
     bindTop(); on('#bk', () => sectionsView()); return;
   }
-  const a = retry.has(q.id) ? null : answered[q.id];
-  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
-    <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
+  const a = practice ? roundAns[q.id] : (retry.has(q.id) ? null : answered[q.id]);
+  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}${practice ? ' · صح ' + Object.values(roundAns).filter(x => x.is_correct).length + ' من ' + Object.keys(roundAns).length : ''}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
+    <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${practice ? '🔄 إعادة الحل · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>`;
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>${reviewing ? '' : '<button class="link rbox" id="rs">🔄 حل من الأول</button>'}`;
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  on('#rs', () => { if (!confirm('تبدأ الأسئلة من الأول؟ أخطاءك وتقدمك الحالي هيفضلوا محفوظين.')) return; practice = true; roundAns = {}; retry = new Set(); i = 0; quizView() });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
@@ -614,10 +615,15 @@ function quizView() {
     if (a) mark(a.chosen_index, a.is_correct ? a.chosen_index : -1);
     if (a && !a.is_correct) sb.rpc('get_answer_key', {qid: q.id}).then(r => { if (!r.error && r.data && qs[i] === q) mark(a.chosen_index, r.data.correct_index) });
     document.querySelectorAll('.ch').forEach(b => b.onclick = async () => {
-      if (answered[q.id] && !retry.has(q.id)) return;
-      const k = +b.dataset.k, {data, error} = await sb.rpc('submit_answer', {qid: q.id, idx: k});
+      if (practice ? roundAns[q.id] : (answered[q.id] && !retry.has(q.id))) return;
+      const k = +b.dataset.k, {data, error} = await sb.rpc(practice ? 'practice_answer' : 'submit_answer', {qid: q.id, idx: k});
       if (error) return alert(accMsg(error));
-      answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id);
+      if (practice) {
+        roundAns[q.id] = {chosen_index: k, is_correct: data.is_correct};
+        // الخطأ الجديد بيتسجل، لكن الإجابة الصح مبتمسحش خطأ قديم
+        if (!answered[q.id] || (!data.is_correct && answered[q.id].is_correct)) answered[q.id] = {chosen_index: k, is_correct: data.is_correct};
+        const sp = document.querySelector('.bar span'); if (sp) sp.textContent = `${i + 1} / ${qs.length} · صح ${Object.values(roundAns).filter(x => x.is_correct).length} من ${Object.keys(roundAns).length}`;
+      } else { answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id) }
       mark(k, data.correct_index);
     });
   } else {
@@ -681,13 +687,9 @@ document.onkeydown = e => {
 };
 
 // ===== حماية المحتوى (ردع: مفيش طريقة تمنع تصوير الشاشة 100% من المتصفح) =====
-function setWM(off) {
-  let w = document.getElementById('wm');
-  if (off || !me) { if (w) w.remove(); return }
-  if (!w) { w = document.createElement('div'); w.id = 'wm'; document.body.appendChild(w) }
-  const t = esc((me.phone || me.name || '') + '');
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="170"><text x="20" y="100" transform="rotate(-24 140 85)" fill="rgba(255,255,255,0.13)" font-size="17" font-family="Arial">' + t + '</text></svg>';
-  w.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+function setWM() {
+  const w = document.getElementById('wm');
+  if (w) w.remove();
 }
 (function () {
   let t;
