@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -404,12 +403,13 @@ function blocksView(y) {
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
-    html += (y === 1 && b === 'Anatomy')
-      ? '<div class="lrow">' + bt + '<button class="sub prac" id="prac"><b>PRACTICAL</b><br><small>عملي التشريح</small></button></div>'
+    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Histology' ? 'histo' : null) : null;
+    html += pk
+      ? '<div class="lrow">' + bt + '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + PZ[pk].name + '</small></button></div>'
       : bt;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
-  on('#prac', () => practicalView());
+  document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => practicalView(pb.dataset.pk));
   document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
@@ -418,36 +418,38 @@ function blocksView(y) {
 
 
 // PRACTICAL (anatomy practical) - images are served from Supabase only to accounts with active access
-let pzMeta = null; const pzImg = {};
-async function practicalView() {
+const PZ = {anat: {tbl: 'practical_slides', name: 'عملي التشريح'}, histo: {tbl: 'practical_histo', name: 'عملي الهستولوجي'}};
+const pzMetaC = {}; const pzImg = {};
+async function practicalView(key) {
+  key = key || 'anat'; const cfg = PZ[key]; let pzMeta = pzMetaC[key];
   view = 'practical'; curYear = 1;
-  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - عملي التشريح</h2><p>⏳ جاري التحميل...</p>';
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - ' + cfg.name + '</h2><p>⏳ جاري التحميل...</p>';
   bindTop(); on('#bk', () => blocksView(1));
   if (!pzMeta) {
-    const r = await sb.from('practical_slides').select('ord,m').order('ord');
+    const r = await sb.from(cfg.tbl).select('ord,m').order('ord');
     if (r.error || !r.data || !r.data.length) { alert(r.error ? accMsg(r.error) : 'لسه مفيش محتوى في العملي'); return blocksView(1) }
-    pzMeta = r.data;
+    pzMeta = pzMetaC[key] = r.data;
   }
   const S = pzMeta, total = S.reduce((a, x) => a + x.m.length, 0);
   let si = 0, mi = 0, shown = false, els = [];
-  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - عملي التشريح</h2>' +
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - ' + cfg.name + '</h2>' +
     '<div class="pz-top"><span id="pz1"></span><span id="pz2"></span></div><div class="pb"><i id="pz-bar" style="width:0"></i></div>' +
     '<div id="pz-wrap"><img id="pz-im" alt=""></div>' +
     '<div id="pz-done" hidden style="text-align:center;margin:14px 0">🎉 خلصت كل الأسئلة.<br><button class="btn" id="pz-again">ابدأ من الأول</button></div>' +
     '<div id="pz-panel"><button id="pz-prev">→ السابق</button><button id="pz-btn">أظهر الإجابة</button></div><div style="height:90px"></div>';
   bindTop(); on('#bk', () => blocksView(1));
   async function load(n) {
-    if (pzImg[n]) return pzImg[n];
-    const r = await sb.from('practical_slides').select('img').eq('ord', n);
+    if (pzImg[key + n]) return pzImg[key + n];
+    const r = await sb.from(cfg.tbl).select('img').eq('ord', n);
     if (r.error || !r.data || !r.data[0]) { alert(r.error ? accMsg(r.error) : 'تعذر تحميل الصورة'); return null }
-    return pzImg[n] = r.data[0].img;
+    return pzImg[key + n] = r.data[0].img;
   }
   async function build() {
     document.querySelectorAll('.pz-m').forEach(e => e.remove()); els = [];
     const im = await load(S[si].ord); if (!im) return false;
     $('#pz-im').src = im;
     els = S[si].m.map((m, k) => { const b = document.createElement('button'); b.className = 'pz-m'; b.style.cssText = 'left:' + m[0] + '%;top:' + m[1] + '%;width:' + m[2] + '%;height:' + m[3] + '%'; b.onclick = () => { mi = k; shown = false; render(true) }; $('#pz-wrap').appendChild(b); return b });
-    if (S[si + 1] && !pzImg[S[si + 1].ord]) load(S[si + 1].ord);
+    if (S[si + 1] && !pzImg[key + S[si + 1].ord]) load(S[si + 1].ord);
     return true;
   }
   function render(sc) {
