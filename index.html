@@ -50,7 +50,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 #pz-panel{position:fixed;left:0;right:0;bottom:0;background:#150a0a;border-top:1.5px solid #3a1c1c;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:5}
 #pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-sv{padding:13px 12px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
 
-.sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}
+.sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}.sub.prac.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed}
 h3{margin:16px 0 4px;color:#e88}
 
 .row button.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed;background:#1b0d0d}.row button.soon small{color:#e88}
@@ -403,9 +403,9 @@ function blocksView(y) {
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
-    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Histology' ? 'histo' : b === 'Biochemistry' ? 'bio' : null) : null;
+    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Histology' ? 'histo' : b === 'Biochemistry' ? 'bio' : b === 'Terminology' ? null : 'soon') : 'soon';
     html += pk
-      ? '<div class="lrow">' + bt + '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button></div>'
+      ? '<div class="lrow">' + bt + (pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button></div>' : '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button></div>')
       : bt;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
