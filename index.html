@@ -48,7 +48,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pz-m.rev{background:transparent;outline:3px solid #c0262d}
 @keyframes pzp{50%{outline-color:transparent}}
 #pz-panel{position:fixed;left:0;right:0;bottom:0;background:#150a0a;border-top:1.5px solid #3a1c1c;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:5}
-#pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
+#pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-sv{padding:13px 12px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
 
 .sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}
 h3{margin:16px 0 4px;color:#e88}
@@ -419,7 +419,7 @@ function blocksView(y) {
 
 // PRACTICAL (anatomy practical) - images are served from Supabase only to accounts with active access
 const PZ = {anat: {tbl: 'practical_slides', name: 'عملي التشريح'}, histo: {tbl: 'practical_histo', name: 'عملي الهستولوجي'}};
-const pzMetaC = {}; const pzImg = {};
+const pzMetaC = {}; const pzImg = {}; const pzSavC = {};
 async function practicalView(key) {
   key = key || 'anat'; const cfg = PZ[key]; let pzMeta = pzMetaC[key];
   view = 'practical'; curYear = 1;
@@ -430,13 +430,20 @@ async function practicalView(key) {
     if (r.error || !r.data || !r.data.length) { alert(r.error ? accMsg(r.error) : 'لسه مفيش محتوى في العملي'); return blocksView(1) }
     pzMeta = pzMetaC[key] = r.data;
   }
-  const S = pzMeta, total = S.reduce((a, x) => a + x.m.length, 0);
-  let si = 0, mi = 0, shown = false, els = [];
+  if (!pzSavC[key]) {
+    const r = await sb.from('practical_saves').select('ord,idx').eq('kind', key);
+    pzSavC[key] = new Set(r.error || !r.data ? [] : r.data.map(x => x.ord + ':' + x.idx));
+  }
+  const sv = pzSavC[key], S = pzMeta;
+  const all = []; S.forEach((x, a) => x.m.forEach((_, k) => all.push([a, k])));
+  let seq = all, p = 0, shown = false, els = [], cur = -1, onlySaved = false;
+  const kOf = (a, k) => S[a].ord + ':' + k;
   app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - ' + cfg.name + '</h2>' +
     '<div class="pz-top"><span id="pz1"></span><span id="pz2"></span></div><div class="pb"><i id="pz-bar" style="width:0"></i></div>' +
+    '<button class="sub" id="pz-only" style="margin-top:8px;padding:8px"></button>' +
     '<div id="pz-wrap"><img id="pz-im" alt=""></div>' +
-    '<div id="pz-done" hidden style="text-align:center;margin:14px 0">🎉 خلصت كل الأسئلة.<br><button class="btn" id="pz-again">ابدأ من الأول</button></div>' +
-    '<div id="pz-panel"><button id="pz-prev">→ السابق</button><button id="pz-btn">أظهر الإجابة</button></div><div style="height:90px"></div>';
+    '<div id="pz-done" hidden style="text-align:center;margin:14px 0"></div>' +
+    '<div id="pz-panel"><button id="pz-prev">→ السابق</button><button id="pz-sv">🔖 حفظ</button><button id="pz-btn">أظهر الإجابة</button></div><div style="height:90px"></div>';
   bindTop(); on('#bk', () => blocksView(1));
   async function load(n) {
     if (pzImg[key + n]) return pzImg[key + n];
@@ -444,40 +451,57 @@ async function practicalView(key) {
     if (r.error || !r.data || !r.data[0]) { alert(r.error ? accMsg(r.error) : 'تعذر تحميل الصورة'); return null }
     return pzImg[key + n] = r.data[0].img;
   }
-  async function build() {
+  async function build(a) {
+    if (a === cur) return true;
     document.querySelectorAll('.pz-m').forEach(e => e.remove()); els = [];
-    const im = await load(S[si].ord); if (!im) return false;
-    $('#pz-im').src = im;
-    els = S[si].m.map((m, k) => { const b = document.createElement('button'); b.className = 'pz-m'; b.style.cssText = 'left:' + m[0] + '%;top:' + m[1] + '%;width:' + m[2] + '%;height:' + m[3] + '%'; b.onclick = () => { mi = k; shown = false; render(true) }; $('#pz-wrap').appendChild(b); return b });
-    if (S[si + 1] && !pzImg[key + S[si + 1].ord]) load(S[si + 1].ord);
+    const im = await load(S[a].ord); if (!im) return false;
+    $('#pz-im').src = im; cur = a;
+    els = S[a].m.map((m, k) => { const b = document.createElement('button'); b.className = 'pz-m'; b.style.cssText = 'left:' + m[0] + '%;top:' + m[1] + '%;width:' + m[2] + '%;height:' + m[3] + '%'; b.onclick = () => { const j = seq.findIndex(t => t[0] === a && t[1] === k); if (j >= 0) { p = j; shown = false; render(true) } }; $('#pz-wrap').appendChild(b); return b });
+    const nx = seq[p + 1]; if (nx && !pzImg[key + S[nx[0]].ord]) load(S[nx[0]].ord);
     return true;
   }
   function render(sc) {
-    const fin = si >= S.length;
+    const fin = p >= seq.length;
+    $('#pz-only').textContent = onlySaved ? '↩ رجوع لكل الأسئلة' : '🔖 المحفوظات (' + sv.size + ')';
     $('#pz-done').hidden = !fin; $('#pz-panel').hidden = fin; $('#pz-wrap').hidden = fin;
-    if (fin) { $('#pz-bar').style.width = '100%'; $('#pz1').textContent = ''; $('#pz2').textContent = ''; return }
-    els.forEach((e, k) => { e.classList.toggle('on', k === mi && !shown); e.classList.toggle('rev', k === mi && shown) });
-    let n = 0; for (let k = 0; k < si; k++) n += S[k].m.length; n += mi + 1;
-    $('#pz1').textContent = 'السؤال ' + n + ' من ' + total;
-    $('#pz2').textContent = 'الصورة ' + (si + 1) + ' من ' + S.length;
-    $('#pz-bar').style.width = ((n - 1) / total * 100) + '%';
-    $('#pz-prev').disabled = si === 0 && mi === 0 && !shown;
+    if (fin) { $('#pz-bar').style.width = '100%'; $('#pz1').textContent = ''; $('#pz2').textContent = ''; $('#pz-done').innerHTML = (onlySaved ? '🔖 خلصت المحفوظات.' : '🎉 خلصت كل الأسئلة.') + '<br><button class="btn" id="pz-again">ابدأ من الأول</button>'; on('#pz-again', () => start(onlySaved)); return }
+    const [a, k] = seq[p];
+    els.forEach((e, j) => { e.classList.toggle('on', j === k && !shown); e.classList.toggle('rev', j === k && shown) });
+    $('#pz1').textContent = (onlySaved ? 'محفوظ ' : 'السؤال ') + (p + 1) + ' من ' + seq.length;
+    $('#pz2').textContent = 'الصورة ' + (a + 1) + ' من ' + S.length;
+    $('#pz-bar').style.width = (p / seq.length * 100) + '%';
+    $('#pz-prev').disabled = p === 0 && !shown;
     $('#pz-btn').textContent = shown ? 'التالي ←' : 'أظهر الإجابة';
-    if (sc && els[mi]) els[mi].scrollIntoView({block: 'center', behavior: 'smooth'});
+    $('#pz-sv').textContent = sv.has(kOf(a, k)) ? '🔖 محفوظ' : '🔖 حفظ';
+    if (sc && els[k]) els[k].scrollIntoView({block: 'center', behavior: 'smooth'});
+  }
+  async function start(only) {
+    onlySaved = only; seq = only ? all.filter(([a, k]) => sv.has(kOf(a, k))) : all; p = 0; shown = false;
+    if (!seq.length) { onlySaved = false; seq = all; alert('مفيش حاجة محفوظة لسه') }
+    if (await build(seq[0][0])) { render(false); window.scrollTo({top: 0}) }
+  }
+  async function goTo(np, sh) {
+    const old = p; p = np;
+    if (p < seq.length && !await build(seq[p][0])) { p = old; return }
+    shown = sh; render(true);
   }
   $('#pz-btn').onclick = async () => {
     if (!shown) { shown = true; render(false); return }
-    shown = false; mi++;
-    if (mi >= S[si].m.length) { si++; mi = 0; if (si < S.length) { if (!await build()) { si--; mi = S[si].m.length - 1; shown = true; return } window.scrollTo({top: 0}); render(false); return } }
-    render(true);
+    await goTo(p + 1, false);
+    if (p < seq.length) window.scrollTo({top: 0}), render(true);
   };
   $('#pz-prev').onclick = async () => {
     if (shown) { shown = false; render(true); return }
-    if (mi > 0) { mi--; shown = false; render(true); return }
-    if (si > 0) { si--; if (!await build()) { si++; return } mi = S[si].m.length - 1; shown = false; window.scrollTo({top: 0}); render(true) }
+    if (p > 0) await goTo(p - 1, false);
   };
-  $('#pz-again').onclick = async () => { si = 0; mi = 0; shown = false; await build(); render(false); window.scrollTo({top: 0}) };
-  if (await build()) render(false);
+  $('#pz-sv').onclick = async () => {
+    const [a, k] = seq[p], id = kOf(a, k);
+    if (sv.has(id)) { sv.delete(id); const r = await sb.from('practical_saves').delete().eq('kind', key).eq('ord', S[a].ord).eq('idx', k); if (r.error) { sv.add(id); alert(accMsg(r.error)) } }
+    else { sv.add(id); const r = await sb.from('practical_saves').insert({user_id: me.id, kind: key, ord: S[a].ord, idx: k}); if (r.error) { sv.delete(id); alert('مقدرتش أحفظ، اتأكد إنك شغّلت practical_saves.sql') } }
+    render(false);
+  };
+  $('#pz-only').onclick = () => start(!onlySaved);
+  start(false);
 }
 
 // 3) subjects of a block
