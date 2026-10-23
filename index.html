@@ -256,15 +256,9 @@ function authView(su) {
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => y === 2 ? `<button type="button" class="soon" disabled>فرقة 2<br><small>قريبًا</small></button>` : `<button data-v="${y}">فرقة ${y}${BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : ''}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
-    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button>
-    ${su ? '' : '<button class="link" id="fp" type="button">هل نسيت كلمة السر؟</button><p class="pay-info" id="fpm" style="display:none"></p>'}</div>`;
+    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
   if (su) pick('#yr', v => year = +v);
   on('#sw', () => authView(!su));
-  on('#fp', () => {
-    const f = $('#fpm');
-    f.innerHTML = linkTG('تواصل معانا على @MEDRACESU واكتبلنا اسمك ورقم التليفون اللي عملت بيه الحساب.');
-    f.style.display = f.style.display === 'none' ? 'block' : 'none';
-  });
   on('#go', async () => {
     const m = t => { $('#m').textContent = t }, p = toEn($('#p').value), w = $('#w').value;
     $('#go').disabled = true;
@@ -464,7 +458,7 @@ function sectionsView(k) {
   if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
   const key = arr.filter(q => q.is_key_point);
   if (key.length) secs.push({t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
-  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
+  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   if (new Set(arr.map(q => q.type)).size > 1) ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t);
     if (a2.length) secs.push({t: t === 'mcq' ? 'اختيار من متعدد' : 'مقالي', f: {type: t}, a: a2});
@@ -607,24 +601,9 @@ async function adminView() {
       <small>${esc(r.note || '')}</small><br>
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
-    <button class="link" id="rf2">تحديث</button></div>
-    <div class="card"><h2>🔑 إعادة كلمة سر طالب</h2>
-      <input id="rp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="rw" dir="ltr" placeholder="كلمة السر الجديدة (6 على الأقل)">
-      <div class="row"><button class="btn" id="rg" type="button">🎲 توليد</button><button class="btn" id="rr" type="button">تغيير</button></div><p class="msg" id="rm"></p></div>`;
+    <button class="link" id="rf2">تحديث</button></div>`;
   bindTop();
   on('#rf2', adminView); on('#bk2', enter);
-  on('#rg', () => { $('#rw').value = String(10000000 + crypto.getRandomValues(new Uint32Array(1))[0] % 90000000) });
-  on('#rr', async () => {
-    const m = t => { $('#rm').textContent = t }, ph = toEn($('#rp').value.trim()), pw = $('#rw').value;
-    if (!ph || pw.length < 6) return m('اكتب رقم الطالب وكلمة سر 6 حروف أو أرقام على الأقل');
-    if (!confirm('تغيّر كلمة سر الرقم ' + ph + '؟ هيتسجّل خروجه من كل أجهزته.')) return;
-    $('#rr').disabled = true;
-    const {data, error} = await sb.rpc('admin_reset_password', {p_phone: ph, p_password: pw});
-    $('#rr').disabled = false;
-    if (error || !data || !data.ok) return m(error && /not found/.test(error.message || '') ? 'مفيش طالب بالرقم ده' : 'مش مسموح أو حصلت مشكلة');
-    m('✔ اتغيّرت كلمة سر ' + data.name + '. ابعتله الكلمة: ' + pw);
-    $('#rw').value = '';
-  });
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
     const ap = b.dataset.a === 'approve';
     if (!confirm(ap ? 'تأكيد قبول الطلب وإضافة الرصيد؟' : 'تأكيد رفض الطلب؟')) return;
