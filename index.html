@@ -40,6 +40,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 .crumb{color:#a88;font-size:13px;margin:8px 0}
 .lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}
 .sub.mine{border-color:#c0262d}
+.pz-top{display:flex;justify-content:space-between;font-size:14px;color:#a88;margin:6px 0}
+#pz-wrap{position:relative;border-radius:10px;overflow:hidden;background:#fff;margin-top:8px;min-height:120px}
+#pz-im{width:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+.pz-m{position:absolute;border:0;border-radius:4px;background:#ffe066;padding:0;cursor:pointer}
+.pz-m.on{outline:3px solid #c0262d;animation:pzp 1s infinite}
+.pz-m.rev{background:transparent;outline:3px solid #c0262d}
+@keyframes pzp{50%{outline-color:transparent}}
+#pz-panel{position:fixed;left:0;right:0;bottom:0;background:#150a0a;border-top:1.5px solid #3a1c1c;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:5}
+#pz-btn{display:block;width:100%;max-width:760px;margin:0 auto;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
+
+.sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}
 h3{margin:16px 0 4px;color:#e88}
 
 .row button.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed;background:#1b0d0d}.row button.soon small{color:#e88}
@@ -391,13 +402,73 @@ function blocksView(y) {
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
-    html += '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
+    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
+    html += (y === 1 && b === 'Anatomy')
+      ? '<div class="lrow">' + bt + '<button class="sub prac" id="prac"><b>PRACTICAL</b><br><small>عملي التشريح</small></button></div>'
+      : bt;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
+  on('#prac', () => practicalView());
   document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
   });
+}
+
+
+// PRACTICAL (anatomy practical) - images are served from Supabase only to accounts with active access
+let pzMeta = null; const pzImg = {};
+async function practicalView() {
+  view = 'practical'; curYear = 1;
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - عملي التشريح</h2><p>⏳ جاري التحميل...</p>';
+  bindTop(); on('#bk', () => blocksView(1));
+  if (!pzMeta) {
+    const r = await sb.from('practical_slides').select('ord,m').order('ord');
+    if (r.error || !r.data || !r.data.length) { alert(r.error ? accMsg(r.error) : 'لسه مفيش محتوى في العملي'); return blocksView(1) }
+    pzMeta = r.data;
+  }
+  const S = pzMeta, total = S.reduce((a, x) => a + x.m.length, 0);
+  let si = 0, mi = 0, shown = false, els = [];
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - عملي التشريح</h2>' +
+    '<div class="pz-top"><span id="pz1"></span><span id="pz2"></span></div><div class="pb"><i id="pz-bar" style="width:0"></i></div>' +
+    '<div id="pz-wrap"><img id="pz-im" alt=""></div>' +
+    '<div id="pz-done" hidden style="text-align:center;margin:14px 0">🎉 خلصت كل الأسئلة.<br><button class="btn" id="pz-again">ابدأ من الأول</button></div>' +
+    '<div id="pz-panel"><button id="pz-btn">أظهر الإجابة</button></div><div style="height:90px"></div>';
+  bindTop(); on('#bk', () => blocksView(1));
+  async function load(n) {
+    if (pzImg[n]) return pzImg[n];
+    const r = await sb.from('practical_slides').select('img').eq('ord', n);
+    if (r.error || !r.data || !r.data[0]) { alert(r.error ? accMsg(r.error) : 'تعذر تحميل الصورة'); return null }
+    return pzImg[n] = r.data[0].img;
+  }
+  async function build() {
+    document.querySelectorAll('.pz-m').forEach(e => e.remove()); els = [];
+    const im = await load(S[si].ord); if (!im) return false;
+    $('#pz-im').src = im;
+    els = S[si].m.map((m, k) => { const b = document.createElement('button'); b.className = 'pz-m'; b.style.cssText = 'left:' + m[0] + '%;top:' + m[1] + '%;width:' + m[2] + '%;height:' + m[3] + '%'; b.onclick = () => { mi = k; shown = false; render(true) }; $('#pz-wrap').appendChild(b); return b });
+    if (S[si + 1] && !pzImg[S[si + 1].ord]) load(S[si + 1].ord);
+    return true;
+  }
+  function render(sc) {
+    const fin = si >= S.length;
+    $('#pz-done').hidden = !fin; $('#pz-panel').hidden = fin; $('#pz-wrap').hidden = fin;
+    if (fin) { $('#pz-bar').style.width = '100%'; $('#pz1').textContent = ''; $('#pz2').textContent = ''; return }
+    els.forEach((e, k) => { e.classList.toggle('on', k === mi && !shown); e.classList.toggle('rev', k === mi && shown) });
+    let n = 0; for (let k = 0; k < si; k++) n += S[k].m.length; n += mi + 1;
+    $('#pz1').textContent = 'السؤال ' + n + ' من ' + total;
+    $('#pz2').textContent = 'الصورة ' + (si + 1) + ' من ' + S.length;
+    $('#pz-bar').style.width = ((n - 1) / total * 100) + '%';
+    $('#pz-btn').textContent = shown ? 'التالي ←' : 'أظهر الإجابة';
+    if (sc && els[mi]) els[mi].scrollIntoView({block: 'center', behavior: 'smooth'});
+  }
+  $('#pz-btn').onclick = async () => {
+    if (!shown) { shown = true; render(false); return }
+    shown = false; mi++;
+    if (mi >= S[si].m.length) { si++; mi = 0; if (si < S.length) { if (!await build()) { si--; mi = S[si].m.length - 1; shown = true; return } window.scrollTo({top: 0}); render(false); return } }
+    render(true);
+  };
+  $('#pz-again').onclick = async () => { si = 0; mi = 0; shown = false; await build(); render(false); window.scrollTo({top: 0}) };
+  if (await build()) render(false);
 }
 
 // 3) subjects of a block
