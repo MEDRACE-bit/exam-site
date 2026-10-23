@@ -38,8 +38,19 @@ button{font:inherit;color:inherit;cursor:pointer}
 .pb{height:4px;background:#3a1c1c;border-radius:4px;margin-top:8px}
 .pb i{display:block;height:100%;background:#c0262d;border-radius:4px}
 .crumb{color:#a88;font-size:13px;margin:8px 0}
-.lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}.wbox{flex:0 0 64px;margin:8px 0;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px}.wbox.off{opacity:.35;border-color:#3a1c1c}.wbox b{font-size:16px}
+.lrow{display:flex;gap:8px;align-items:stretch}.lrow .sub{flex:1;width:auto}
 .sub.mine{border-color:#c0262d}
+.pz-top{display:flex;justify-content:space-between;font-size:14px;color:#a88;margin:6px 0}
+#pz-wrap{position:relative;border-radius:10px;overflow:hidden;background:#fff;margin-top:8px;min-height:120px}
+#pz-im{width:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+.pz-m{position:absolute;border:0;border-radius:4px;background:#ffe066;padding:0;cursor:pointer}
+.pz-m.on{outline:3px solid #c0262d;animation:pzp 1s infinite}
+.pz-m.rev{background:transparent;outline:3px solid #c0262d}
+@keyframes pzp{50%{outline-color:transparent}}
+#pz-panel{position:fixed;left:0;right:0;bottom:0;background:#150a0a;border-top:1.5px solid #3a1c1c;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));z-index:5}
+#pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-sv{padding:13px 12px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
+
+.sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}.sub.prac.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed}
 h3{margin:16px 0 4px;color:#e88}
 
 .row button.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed;background:#1b0d0d}.row button.soon small{color:#e88}
@@ -82,7 +93,6 @@ const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.inde
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
-let retry = new Set(), reviewing = false;
 
 function accMsg(e) {
   const st = e && e.status;
@@ -257,9 +267,15 @@ function authView(su) {
     (su ? `<input id="n" placeholder="الاسم"><div class="row" id="yr">${[1,2,3].map(y => y === 2 ? `<button type="button" class="soon" disabled>فرقة 2<br><small>قريبًا</small></button>` : `<button data-v="${y}">فرقة ${y}${BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : ''}</button>`).join('')}</div>` : '') +
     `<input id="p" inputmode="tel" placeholder="رقم التليفون"><input id="w" type="password" placeholder="كلمة السر">
     <button class="btn" id="go">${su ? 'تسجيل' : 'دخول'}</button><p class="msg" id="m"></p>
-    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button></div>`;
+    <button class="link" id="sw">${su ? 'عندي حساب' : 'عمل حساب جديد'}</button>
+    ${su ? '' : '<button class="link" id="fp" type="button">هل نسيت كلمة السر؟</button><p class="pay-info" id="fpm" style="display:none"></p>'}</div>`;
   if (su) pick('#yr', v => year = +v);
   on('#sw', () => authView(!su));
+  on('#fp', () => {
+    const f = $('#fpm');
+    f.innerHTML = linkTG('تواصل معانا على @MEDRACESU واكتبلنا اسمك ورقم التليفون اللي عملت بيه الحساب.');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  });
   on('#go', async () => {
     const m = t => { $('#m').textContent = t }, p = toEn($('#p').value), w = $('#w').value;
     $('#go').disabled = true;
@@ -308,7 +324,6 @@ const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
-const isWrong = m => !!answered[m.id] && answered[m.id].is_correct === false;
 const bar = (n, t) => '<div class="pb"><i style="width:' + (t ? Math.round(100 * n / t) : 0) + '%"></i></div>';
 const BATCH = {1: 38, 2: 37, 3: 36};
 const yName = y => 'الفرقة ' + y + (BATCH[y] ? ' (دفعة ' + BATCH[y] + ')' : '');
@@ -377,7 +392,7 @@ function icon(name) {
 
 // 2) blocks of a year
 function blocksView(y) {
-  view = 'blocks'; curYear = y; curBlock = null; curSub = null; curLec = null;
+  pracMode = false; view = 'blocks'; curYear = y; curBlock = null; curSub = null; curLec = null;
   const list = subs.filter(x => x.year === y);
   const blocks = [...new Set(list.map(x => x.block))].sort((a, b) => {
     const o = BLOCK_ORDER[y] || [], ia = o.indexOf(a), ib = o.indexOf(b);
@@ -387,13 +402,106 @@ function blocksView(y) {
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
-    html += '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
+    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
+    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
+    html += pk
+      ? '<div class="lrow">' + bt + (pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button></div>' : '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button></div>')
+      : bt;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
+  document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => { if (pb.dataset.pk === 'bio') { const sb1 = subs.find(x => x.year === 1 && x.block === 'Biochemistry'); if (!sb1) return alert('لسه مفيش عملي'); curBlock = 'Biochemistry'; pracMode = true; lecturesView(sb1) } else practicalView(pb.dataset.pk) });
   document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
   });
+}
+
+
+// PRACTICAL (anatomy practical) - images are served from Supabase only to accounts with active access
+const PZ = {anat: {tbl: 'practical_slides', name: 'عملي التشريح'}, histo: {tbl: 'practical_histo', name: 'عملي الهستولوجي'}};
+const pzMetaC = {}; const pzImg = {}; const pzSavC = {};
+async function practicalView(key) {
+  key = key || 'anat'; const cfg = PZ[key]; let pzMeta = pzMetaC[key];
+  view = 'practical'; curYear = 1;
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - ' + cfg.name + '</h2><p>⏳ جاري التحميل...</p>';
+  bindTop(); on('#bk', () => blocksView(1));
+  if (!pzMeta) {
+    const r = await sb.from(cfg.tbl).select('ord,m').order('ord');
+    if (r.error || !r.data || !r.data.length) { alert(r.error ? accMsg(r.error) : 'لسه مفيش محتوى في العملي'); return blocksView(1) }
+    pzMeta = pzMetaC[key] = r.data;
+  }
+  if (!pzSavC[key]) {
+    const r = await sb.from('practical_saves').select('ord,idx').eq('kind', key);
+    pzSavC[key] = new Set(r.error || !r.data ? [] : r.data.map(x => x.ord + ':' + x.idx));
+  }
+  const sv = pzSavC[key], S = pzMeta;
+  const all = []; S.forEach((x, a) => x.m.forEach((_, k) => all.push([a, k])));
+  let seq = all, p = 0, shown = false, els = [], cur = -1, onlySaved = false;
+  const kOf = (a, k) => S[a].ord + ':' + k;
+  app.innerHTML = topBar() + BK('‹ البلوكات') + '<h2>PRACTICAL - ' + cfg.name + '</h2>' +
+    '<div class="pz-top"><span id="pz1"></span><span id="pz2"></span></div><div class="pb"><i id="pz-bar" style="width:0"></i></div>' +
+    '<button class="sub" id="pz-only" style="margin-top:8px;padding:8px"></button>' +
+    '<div id="pz-wrap"><img id="pz-im" alt=""></div>' +
+    '<div id="pz-done" hidden style="text-align:center;margin:14px 0"></div>' +
+    '<div id="pz-panel"><button id="pz-prev">→ السابق</button><button id="pz-sv">🔖 حفظ</button><button id="pz-btn">أظهر الإجابة</button></div><div style="height:90px"></div>';
+  bindTop(); on('#bk', () => blocksView(1));
+  async function load(n) {
+    if (pzImg[key + n]) return pzImg[key + n];
+    const r = await sb.from(cfg.tbl).select('img').eq('ord', n);
+    if (r.error || !r.data || !r.data[0]) { alert(r.error ? accMsg(r.error) : 'تعذر تحميل الصورة'); return null }
+    return pzImg[key + n] = r.data[0].img;
+  }
+  async function build(a) {
+    if (a === cur) return true;
+    document.querySelectorAll('.pz-m').forEach(e => e.remove()); els = [];
+    const im = await load(S[a].ord); if (!im) return false;
+    $('#pz-im').src = im; cur = a;
+    els = S[a].m.map((m, k) => { const b = document.createElement('button'); b.className = 'pz-m'; b.style.cssText = 'left:' + m[0] + '%;top:' + m[1] + '%;width:' + m[2] + '%;height:' + m[3] + '%'; b.onclick = () => { const j = seq.findIndex(t => t[0] === a && t[1] === k); if (j >= 0) { p = j; shown = false; render(true) } }; $('#pz-wrap').appendChild(b); return b });
+    const nx = seq[p + 1]; if (nx && !pzImg[key + S[nx[0]].ord]) load(S[nx[0]].ord);
+    return true;
+  }
+  function render(sc) {
+    const fin = p >= seq.length;
+    $('#pz-only').textContent = onlySaved ? '↩ رجوع لكل الأسئلة' : '🔖 المحفوظات (' + sv.size + ')';
+    $('#pz-done').hidden = !fin; $('#pz-panel').hidden = fin; $('#pz-wrap').hidden = fin;
+    if (fin) { $('#pz-bar').style.width = '100%'; $('#pz1').textContent = ''; $('#pz2').textContent = ''; $('#pz-done').innerHTML = (onlySaved ? '🔖 خلصت المحفوظات.' : '🎉 خلصت كل الأسئلة.') + '<br><button class="btn" id="pz-again">ابدأ من الأول</button>'; on('#pz-again', () => start(onlySaved)); return }
+    const [a, k] = seq[p];
+    els.forEach((e, j) => { e.classList.toggle('on', j === k && !shown); e.classList.toggle('rev', j === k && shown) });
+    $('#pz1').textContent = (onlySaved ? 'محفوظ ' : 'السؤال ') + (p + 1) + ' من ' + seq.length;
+    $('#pz2').textContent = 'الصورة ' + (a + 1) + ' من ' + S.length;
+    $('#pz-bar').style.width = (p / seq.length * 100) + '%';
+    $('#pz-prev').disabled = p === 0 && !shown;
+    $('#pz-btn').textContent = shown ? 'التالي ←' : 'أظهر الإجابة';
+    $('#pz-sv').textContent = sv.has(kOf(a, k)) ? '🔖 محفوظ' : '🔖 حفظ';
+    if (sc && els[k]) els[k].scrollIntoView({block: 'center', behavior: 'smooth'});
+  }
+  async function start(only) {
+    onlySaved = only; seq = only ? all.filter(([a, k]) => sv.has(kOf(a, k))) : all; p = 0; shown = false;
+    if (!seq.length) { onlySaved = false; seq = all; alert('مفيش حاجة محفوظة لسه') }
+    if (await build(seq[0][0])) { render(false); window.scrollTo({top: 0}) }
+  }
+  async function goTo(np, sh) {
+    const old = p; p = np;
+    if (p < seq.length && !await build(seq[p][0])) { p = old; return }
+    shown = sh; render(true);
+  }
+  $('#pz-btn').onclick = async () => {
+    if (!shown) { shown = true; render(false); return }
+    await goTo(p + 1, false);
+    if (p < seq.length) window.scrollTo({top: 0}), render(true);
+  };
+  $('#pz-prev').onclick = async () => {
+    if (shown) { shown = false; render(true); return }
+    if (p > 0) await goTo(p - 1, false);
+  };
+  $('#pz-sv').onclick = async () => {
+    const [a, k] = seq[p], id = kOf(a, k);
+    if (sv.has(id)) { sv.delete(id); const r = await sb.from('practical_saves').delete().eq('kind', key).eq('ord', S[a].ord).eq('idx', k); if (r.error) { sv.add(id); alert(accMsg(r.error)) } }
+    else { sv.add(id); const r = await sb.from('practical_saves').insert({user_id: me.id, kind: key, ord: S[a].ord, idx: k}); if (r.error) { sv.delete(id); alert('مقدرتش أحفظ، اتأكد إنك شغّلت practical_saves.sql') } }
+    render(false);
+  };
+  $('#pz-only').onclick = () => start(!onlySaved);
+  start(false);
 }
 
 // 3) subjects of a block
@@ -410,6 +518,8 @@ function subjectsView(y, block) {
 const backFromLec = () => subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? blocksView(curYear) : subjectsView(curYear);
 
 // 4) lectures of a subject (a lecture = the "chapter" column)
+let pracMode = false;
+const isPrac = c => /^\s*practical\b/i.test(c || '');
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
   if (!unlocked()) {
@@ -418,8 +528,8 @@ async function lecturesView(sub) {
     metaFor = null;
     let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
-    else if (!(ls || []).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
-    else (ls || []).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
+    else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
+    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
     return;
   }
@@ -437,22 +547,17 @@ async function lecturesView(sub) {
     metaFor = sub.id;
   }
   const groups = {};
-  meta.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
+  meta.forEach(q => { if (isPrac(chOf(q)) === pracMode) (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
   const card = (k, t, arr) => {
-    const w = arr.filter(isWrong).length;
-    return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button>' +
-      '<button class="wbox' + (w ? '' : ' off') + '" data-k="' + esc(k) + '" data-w="' + w + '" title="أخطائي"><span>❌</span><b>' + w + '</b></button></div>';
+    return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button></div>';
   };
-  let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
-  if (!meta.length) html += '<p>لسه مفيش أسئلة في المادة دي</p>';
+  let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + (pracMode ? 'PRACTICAL - ' : '') + esc(sub.name) + '</h2>';
+  if (!Object.keys(groups).length) html += '<p>لسه مفيش أسئلة في ' + (pracMode ? 'العملي ده' : 'المادة دي') + '</p>';
   else {
-    html += '<button class="sub" id="svb"><b>🔖 المحفوظات</b><br><small>' + meta.filter(q => saved.has(q.id)).length + ' سؤال محفوظ</small></button>';
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
   app.innerHTML = html; bindTop(); on('#bk', backFromLec);
-  on('#svb', savedView);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
-  document.querySelectorAll('.wbox').forEach(b => b.onclick = () => { if (+b.dataset.w) { curLec = b.dataset.k; startQuiz({wrong: 1}) } });
 }
 
 // 5) question sections of a lecture: all / important / by source / by type
@@ -461,11 +566,11 @@ function sectionsView(k) {
   view = 'sections'; curLec = k;
   const arr = k === LEC_ALL ? meta : meta.filter(q => chOf(q) === k);
   const secs = [{t: 'كل الأسئلة', f: {}, a: arr}];
-  const wr = arr.filter(isWrong);
-  if (wr.length) secs.push({t: '❌ أخطائي', f: {wrong: 1}, a: wr, plain: 1});
+  const mySaved = arr.filter(q => saved.has(q.id));
+  if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
   const key = arr.filter(q => q.is_key_point);
   if (key.length) secs.push({t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ الأهم (ركّز عليها الدكتور)', f: {key: 1}, a: key});
-  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: 'المصدر: ' + s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
+  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   if (new Set(arr.map(q => q.type)).size > 1) ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t);
     if (a2.length) secs.push({t: t === 'mcq' ? 'اختيار من متعدد' : 'مقالي', f: {type: t}, a: a2});
@@ -473,10 +578,11 @@ function sectionsView(k) {
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
-      : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + ' سؤال</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
+      : '<small>' + solvedIn(s.a) + ' / ' + s.a.length + (s.saved ? ' سؤال محفوظ' : ' سؤال') + '</small>' + bar(solvedIn(s.a), s.a.length)) + '</button>').join('');
   bindTop(); on('#bk', () => lecturesView(curSub));
   document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
     const sc = secs[+b.dataset.n];
+    if (sc.saved) return savedTypes(k);
     if (sc.f.key && new Set(sc.a.map(q => q.type)).size > 1) return keyTypesView(sc);
     startQuiz(sc.f);
   });
@@ -492,23 +598,6 @@ function keyTypesView(sc) {
   document.querySelectorAll('.kty').forEach(b => b.onclick = () => startQuiz({key: 1, type: ts[+b.dataset.n].t}));
 }
 
-// my mistakes, divided by lecture
-function mistakesView() {
-  view = 'mistakes'; curLec = null;
-  const groups = {};
-  meta.filter(isWrong).forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
-  const total = meta.filter(isWrong).length;
-  const btn = (k, t, n) => '<button class="sub mk" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + n + ' سؤال للمراجعة</small></button>';
-  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>❌ أخطائي</h2>';
-  if (!total) html += '<p>مفيش أخطاء، تمام!</p>';
-  else {
-    html += btn(LEC_ALL, 'مراجعة كل الأخطاء', total);
-    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += btn(k, lecName(k), groups[k].length) });
-  }
-  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
-  document.querySelectorAll('.mk').forEach(b => b.onclick = () => { curLec = b.dataset.k; startQuiz({wrong: 1}) });
-}
-
 // ترتيب الإجابة النموذجية: كل نقطة في سطر لوحدها
 function fmtModel(t) {
   if (!t) return 'مفيش إجابة نموذجية';
@@ -520,39 +609,22 @@ function fmtModel(t) {
     '<div class="ml' + (/^(\d{1,2}[\)\.]|[A-Za-z]\)|[-•–])\s/.test(l) ? ' pt' : '') + '">' + esc(l) + '</div>').join('');
 }
 
-// المحفوظات: 1) اختيار المحاضرة  2) اختياري / مقالي (لو موجود)  3) الحل زي الطبيعي
-function savedView() {
-  view = 'saved'; curLec = null; fromSaved = false; savedLec = null;
-  const mine = meta.filter(q => saved.has(q.id));
-  const groups = {};
-  mine.forEach(q => { (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
-  const ks = Object.keys(groups).sort((x, y) => x.localeCompare(y, 'ar', {numeric: true}));
-  const btn = (k, t, a) => '<button class="sub svl" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(a) + ' / ' + a.length + ' سؤال محفوظ</small>' + bar(solvedIn(a), a.length) + '</button>';
-  let html = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>🔖 المحفوظات</h2>';
-  if (!mine.length) html += '<p>لسه ماحفظتش أي سؤال. دوس "☆ حفظ" جوّا أي سؤال.</p>';
-  else {
-    if (ks.length > 1) html += btn(LEC_ALL, 'كل المحاضرات', mine);
-    ks.forEach(k => { html += btn(k, lecName(k), groups[k]) });
-  }
-  app.innerHTML = html; bindTop(); on('#bk', () => lecturesView(curSub));
-  document.querySelectorAll('.svl').forEach(b => b.onclick = () => savedTypes(b.dataset.k));
-}
-
+// المحفوظات بتتفتح من جوه كل محاضرة (اختياري / مقالي لو موجود) وبعدين الحل زي الطبيعي
 function savedTypes(k) {
   if (k === undefined) k = savedLec;
   view = 'savedtypes'; savedLec = k; fromSaved = false;
   const mine = meta.filter(q => saved.has(q.id) && (k === LEC_ALL || chOf(q) === k));
   const secs = [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
-  app.innerHTML = topBar() + BK('‹ المحفوظات') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
+  app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
     secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
-  bindTop(); on('#bk', savedView);
+  bindTop(); on('#bk', () => sectionsView(k));
   document.querySelectorAll('.svt').forEach(b => b.onclick = async () => {
     loading();
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
-    retry = new Set(); reviewing = false; fromSaved = true;
+    fromSaved = true;
     const first = qs.findIndex(x => !answered[x.id]);
     i = first < 0 ? 0 : first; quizView();
   });
@@ -561,27 +633,18 @@ function savedTypes(k) {
 // 6) load the chosen section and start the quiz
 async function startQuiz(f) {
   loading();
-  const scope = curLec === LEC_ALL ? meta : meta.filter(q => chOf(q) === curLec);
-  let res;
-  if (f.wrong) {
-    const ids = scope.filter(isWrong).map(q => q.id);
-    retry = new Set(ids);
-    res = await fetchByIds(ids);
-  } else {
-    retry = new Set();
-    res = await fetchAll(() => {
-      let q = sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').eq('subject_id', curSub.id);
-      if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
-      if (f.key) q = q.eq('is_key_point', 'true');
-      if (f.src) q = q.eq('source_tag', f.src);
-      if (f.type) q = q.eq('type', f.type);
-      return q.order('id');
-    });
-  }
+  const res = await fetchAll(() => {
+    let q = sb.from('questions').select('id,type,body,choices,chapter,source_tag,is_key_point').eq('subject_id', curSub.id);
+    if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
+    if (f.key) q = q.eq('is_key_point', 'true');
+    if (f.src) q = q.eq('source_tag', f.src);
+    if (f.type) q = q.eq('type', f.type);
+    return q.order('id');
+  });
   if (res.error) { alert(accMsg(res.error)); return sectionsView() }
-  qs = res.data; reviewing = !!f.wrong; fromSaved = false;
+  qs = res.data; fromSaved = false;
   const first = qs.findIndex(x => !answered[x.id]);
-  i = (f.wrong || first < 0) ? 0 : first;
+  i = first < 0 ? 0 : first;
   quizView();
 }
 
@@ -593,12 +656,20 @@ function quizView() {
     app.innerHTML = topBar() + BK('‹ رجوع') + '<div class="card">مفيش أسئلة في المادة دي لسه</div>';
     bindTop(); on('#bk', () => sectionsView()); return;
   }
-  const a = retry.has(q.id) ? null : answered[q.id];
+  const a = answered[q.id];
   app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
-    <div class="card"><small>${reviewing ? '❌ مراجعة الأخطاء · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
+    <div class="card"><small>${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>`;
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">🔄 حل من الأول</button>`;
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  on('#rs', async () => {
+    if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
+    const btn = $('#rs'); if (btn) btn.disabled = true;
+    const ids = qs.map(x => x.id);
+    const {error} = await sb.rpc('reset_progress', {qids: ids});
+    if (error) { if (btn) btn.disabled = false; return alert('حصلت مشكلة، حاول تاني') }
+    ids.forEach(id => { delete answered[id] }); i = 0; quizView();
+  });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
@@ -614,10 +685,10 @@ function quizView() {
     if (a) mark(a.chosen_index, a.is_correct ? a.chosen_index : -1);
     if (a && !a.is_correct) sb.rpc('get_answer_key', {qid: q.id}).then(r => { if (!r.error && r.data && qs[i] === q) mark(a.chosen_index, r.data.correct_index) });
     document.querySelectorAll('.ch').forEach(b => b.onclick = async () => {
-      if (answered[q.id] && !retry.has(q.id)) return;
+      if (answered[q.id]) return;
       const k = +b.dataset.k, {data, error} = await sb.rpc('submit_answer', {qid: q.id, idx: k});
       if (error) return alert(accMsg(error));
-      answered[q.id] = {chosen_index: k, is_correct: data.is_correct}; retry.delete(q.id);
+      answered[q.id] = {chosen_index: k, is_correct: data.is_correct};
       mark(k, data.correct_index);
     });
   } else {
@@ -647,7 +718,10 @@ async function adminView() {
       <small>${esc(r.note || '')}</small><br>
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
-    <button class="link" id="rf2">تحديث</button></div>`;
+    <button class="link" id="rf2">تحديث</button></div>
+    <div class="card"><h2>🔑 إعادة كلمة سر طالب</h2>
+      <input id="rp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="rw" dir="ltr" placeholder="كلمة السر الجديدة (6 على الأقل)">
+      <div class="row"><button class="btn" id="rg" type="button">🎲 توليد</button><button class="btn" id="rr" type="button">تغيير</button></div><p class="msg" id="rm"></p></div>`;
   bindTop();
   on('#rf2', adminView); on('#bk2', enter);
   document.querySelectorAll('[data-ac]').forEach(b => b.onclick = async () => {
@@ -657,6 +731,18 @@ async function adminView() {
     const {data, error} = await sb.rpc(ap ? 'approve_account' : 'reject_account', {uid: b.dataset.id});
     if (error || !data || !data.ok) alert('الطلب اتعالج قبل كده أو حصلت مشكلة');
     adminView();
+  });
+  on('#rg', () => { $('#rw').value = String(10000000 + crypto.getRandomValues(new Uint32Array(1))[0] % 90000000) });
+  on('#rr', async () => {
+    const m = t => { $('#rm').textContent = t }, ph = toEn($('#rp').value.trim()), pw = $('#rw').value;
+    if (!ph || pw.length < 6) return m('اكتب رقم الطالب وكلمة سر 6 حروف أو أرقام على الأقل');
+    if (!confirm('تغيّر كلمة سر الرقم ' + ph + '؟ هيتسجّل خروجه من كل أجهزته.')) return;
+    $('#rr').disabled = true;
+    const {data, error} = await sb.rpc('admin_reset_password', {p_phone: ph, p_password: pw});
+    $('#rr').disabled = false;
+    if (error || !data || !data.ok) return m(error && /not found/.test(error.message || '') ? 'مفيش طالب بالرقم ده' : 'مش مسموح أو حصلت مشكلة');
+    m('✔ اتغيّرت كلمة سر ' + data.name + '. ابعتله الكلمة: ' + pw);
+    $('#rw').value = '';
   });
   document.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
     const ap = b.dataset.a === 'approve';
@@ -694,13 +780,9 @@ document.onkeydown = e => {
 };
 
 // ===== حماية المحتوى (ردع: مفيش طريقة تمنع تصوير الشاشة 100% من المتصفح) =====
-function setWM(off) {
-  let w = document.getElementById('wm');
-  if (off || !me) { if (w) w.remove(); return }
-  if (!w) { w = document.createElement('div'); w.id = 'wm'; document.body.appendChild(w) }
-  const t = esc((me.phone || me.name || '') + '');
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="170"><text x="20" y="100" transform="rotate(-24 140 85)" fill="rgba(255,255,255,0.13)" font-size="17" font-family="Arial">' + t + '</text></svg>';
-  w.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+function setWM() {
+  const w = document.getElementById('wm');
+  if (w) w.remove();
 }
 (function () {
   let t;
