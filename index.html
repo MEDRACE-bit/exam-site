@@ -403,7 +403,7 @@ function blocksView(y) {
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
-    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Histology' ? 'histo' : b === 'Biochemistry' ? 'bio' : b === 'Terminology' ? null : 'soon') : 'soon';
+    const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     html += pk
       ? '<div class="lrow">' + bt + (pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button></div>' : '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button></div>')
       : bt;
