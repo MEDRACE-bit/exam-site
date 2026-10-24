@@ -854,7 +854,7 @@ function setWM() {
     const i = d.querySelector('#pwa-i'); if (i) i.onclick = async () => { d.remove(); dp.prompt(); dp = null };
   };
   addEventListener('beforeinstallprompt', e => { e.preventDefault(); dp = e; bar('ثبّت MEDRACE كتطبيق على موبايلك') });
-  if (/iphone|ipad/i.test(navigator.userAgent)) setTimeout(() => bar('للتثبيت: اضغط زرار المشاركة ثم "إضافة إلى الشاشة الرئيسية"'), 4000);
+  if (/iphone|ipad/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) setTimeout(() => bar('للتثبيت: اضغط زرار المشاركة ثم "إضافة إلى الشاشة الرئيسية"'), 4000);
 })();
 </script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
