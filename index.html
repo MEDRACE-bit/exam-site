@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn:disabled{opacity:.5}
 .ic{display:inline-block;width:38px;height:38px;vertical-align:middle;margin-inline-end:10px}.ic svg,.ic img{width:100%;height:100%;display:block;object-fit:contain}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
-.link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}.pay-info a,.blk a{color:#ffd54a;font-weight:700;text-decoration:underline}
+.link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}.pay-info a{color:#ffd54a;font-weight:700;text-decoration:underline}
 .back{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #c0262d;color:#ffd0d0;border-radius:14px;padding:8px 18px;margin:8px 0;font:inherit;font-weight:700;cursor:pointer}.back:active{background:#3a1c1c}.bar .back{margin:0}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
 .tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
@@ -312,7 +312,7 @@ function blockedView(r) {
   view = 'blocked';
   const pend = r === 'pending';
   app.innerHTML = `<div class="card"><h2>${pend ? '⏳ حسابك قيد المراجعة' : '⛔ الحساب موقوف'}</h2>
-    <p class="blk">${pend ? 'الجهاز ده اتعمل عليه حساب قبل كده. كلمنا على ' + linkTG(esc(SUPPORT)) + ' عشان نفعّل حسابك.' : 'كلمنا على ' + linkTG(esc(SUPPORT))}</p>
+    <p>${pend ? 'الجهاز ده اتعمل عليه حساب قبل كده. كلمنا على ' + esc(SUPPORT) + ' عشان نفعّل حسابك.' : 'كلمنا على ' + esc(SUPPORT)}</p>
     ${pend ? '<button class="btn" id="rf">تحديث</button>' : ''}<button class="link" id="lo">خروج</button></div>`;
   on('#rf', enter);
   on('#lo', async () => { if (!confirm('متأكد إنك عايز تخرج من حسابك؟')) return; await sb.auth.signOut(); authView(false) });
@@ -573,7 +573,7 @@ function sectionsView(k) {
   Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   if (new Set(arr.map(q => q.type)).size > 1) ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t);
-    if (a2.length) secs.push({t: t === 'mcq' ? 'اختيار من متعدد' : 'مقالي', f: {type: t}, a: a2});
+    if (a2.length) secs.push({t: t === 'mcq' ? 'MCQ' : 'Written', f: {type: t}, a: a2});
   });
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
@@ -591,7 +591,7 @@ function sectionsView(k) {
 // المهم: لو فيه اختياري ومقالي يخيّره الأول
 function keyTypesView(sc) {
   view = 'keytypes';
-  const ts = [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].map(([t, n]) => ({t, n, a: sc.a.filter(q => q.type === t)})).filter(x => x.a.length);
+  const ts = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: sc.a.filter(q => q.type === t)})).filter(x => x.a.length);
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
     ts.map((x, n) => '<button class="sub kty" data-n="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
   bindTop(); on('#bk', () => sectionsView());
@@ -614,7 +614,7 @@ function savedTypes(k) {
   if (k === undefined) k = savedLec;
   view = 'savedtypes'; savedLec = k; fromSaved = false;
   const mine = meta.filter(q => saved.has(q.id) && (k === LEC_ALL || chOf(q) === k));
-  const secs = [['mcq', 'اختيار من متعدد'], ['written', 'مقالي']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
+  const secs = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
     secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
@@ -705,12 +705,7 @@ async function adminView() {
   view = 'admin';
   const {data: list, error} = await sb.rpc('admin_list_topups');
   const rows = Array.isArray(list) ? list : [];
-  const {data: pa} = await sb.rpc('admin_list_pending_accounts');
-  const accs = Array.isArray(pa) ? pa : [];
-  app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات إنشاء الحساب (${accs.length})</h2>
-    ${accs.map(a => `<div class="card"><b>${esc(a.name)}</b> — ${yName(+a.year)}<br><span dir="ltr">${esc(a.phone)}</span><br>
-      <small>الجهاز ده اتعمل عليه حساب قبل كده</small>
-      <div class="row"><button class="btn ok" data-ac="approve" data-id="${a.id}">✔ قبول</button><button class="btn no" data-ac="reject" data-id="${a.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات إنشاء حساب</p>'}</div>` + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
+  app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات الشحن المعلّقة (${rows.length})</h2>
     ${error ? '<p class="msg">مش مسموح أو حصلت مشكلة</p>' : ''}
     ${rows.map(r => `<div class="card" data-id="${r.id}"><b>${esc(r.name)}</b> — ${yName(+r.year)}<br>
       <span dir="ltr">${esc(r.phone)}</span><br>
@@ -724,14 +719,6 @@ async function adminView() {
       <div class="row"><button class="btn" id="rg" type="button">🎲 توليد</button><button class="btn" id="rr" type="button">تغيير</button></div><p class="msg" id="rm"></p></div>`;
   bindTop();
   on('#rf2', adminView); on('#bk2', enter);
-  document.querySelectorAll('[data-ac]').forEach(b => b.onclick = async () => {
-    const ap = b.dataset.ac === 'approve';
-    if (!confirm(ap ? 'تأكيد تفعيل الحساب؟' : 'تأكيد رفض الحساب؟')) return;
-    b.disabled = true;
-    const {data, error} = await sb.rpc(ap ? 'approve_account' : 'reject_account', {uid: b.dataset.id});
-    if (error || !data || !data.ok) alert('الطلب اتعالج قبل كده أو حصلت مشكلة');
-    adminView();
-  });
   on('#rg', () => { $('#rw').value = String(10000000 + crypto.getRandomValues(new Uint32Array(1))[0] % 90000000) });
   on('#rr', async () => {
     const m = t => { $('#rm').textContent = t }, ph = toEn($('#rp').value.trim()), pw = $('#rw').value;
