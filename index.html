@@ -3,12 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#140a0a">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="MEDRACE">
 <title>MEDRACE</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
@@ -841,22 +835,9 @@ function setWM() {
 })();
 </script>
 <script>
-(() => {
-  if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) return;
-  let dp = null;
-  const bar = txt => {
-    try { if (localStorage.getItem('pwa_x')) return } catch (e) {}
-    const d = document.createElement('div');
-    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;max-width:520px;margin:auto;background:#241212;border:1px solid #c0262d;border-radius:14px;padding:12px;z-index:99;display:flex;gap:10px;align-items:center;color:#f4eaea;font:14px Cairo,system-ui,sans-serif';
-    d.innerHTML = '<span style="flex:1">' + txt + '</span>' + (dp ? '<button id="pwa-i" style="background:#c0262d;color:#fff;border:0;border-radius:10px;padding:8px 14px;font-weight:700">تثبيت</button>' : '') + '<button id="pwa-x" style="background:none;border:0;color:#e88;font-size:18px">✕</button>';
-    document.body.appendChild(d);
-    d.querySelector('#pwa-x').onclick = () => { d.remove(); try { localStorage.setItem('pwa_x', '1') } catch (e) {} };
-    const i = d.querySelector('#pwa-i'); if (i) i.onclick = async () => { d.remove(); dp.prompt(); dp = null };
-  };
-  addEventListener('beforeinstallprompt', e => { e.preventDefault(); dp = e; bar('ثبّت MEDRACE كتطبيق على موبايلك') });
-  if (/iphone|ipad/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) setTimeout(() => bar('للتثبيت: اضغط زرار المشاركة ثم "إضافة إلى الشاشة الرئيسية"'), 4000);
-})();
+// تنظيف: إلغاء أي service worker قديم وتفريغ الكاش
+if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
 </script>
-<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body>
 </html>
