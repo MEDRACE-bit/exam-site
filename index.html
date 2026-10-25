@@ -241,11 +241,22 @@ async function buyAccess() {
   me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
   curSub && view === 'lectures' ? lecturesView(curSub) : enter();
 }
+let sub30 = {mode: 'soon', price: 40, old: null};
+async function loadSub30() {
+  const {data} = await sb.rpc('get_sub30');
+  sub30 = data && data.mode ? data : {mode: 'soon', price: 40, old: null};
+}
+const s30Box = () => sub30.mode === 'soon'
+  ? '<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم</small><button class="btn" id="b30" disabled style="opacity:.5;cursor:not-allowed">قريبًا</button></div>'
+  : (p => '<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم بـ ' + p + ' <i class="coin"></i></small><button class="btn" id="b30">اشترك 30 يوم بـ ' + p + ' <i class="coin"></i></button></div>')(sub30.old ? '<s>' + sub30.old + '</s> ' + sub30.price : sub30.price);
 async function buy30() {
-  if (!confirm('هيتخصم 60 coin من رصيدك وتفتح الأسئلة 30 يوم. متأكد؟')) return;
+  await loadSub30();
+  if (sub30.mode === 'soon') { alert('اشتراك 30 يوم قريبًا'); return walletView() }
+  if (!confirm('هيتخصم ' + sub30.price + ' coin من رصيدك وتفتح الأسئلة 30 يوم. متأكد؟')) return;
   const {data: r, error} = await sb.rpc('buy_access_30d');
   if (error || !r) return alert('حصلت مشكلة، حاول تاني');
   if (!r.ok) {
+    if (r.reason === 'soon') { alert('اشتراك 30 يوم قريبًا'); return walletView() }
     if (r.reason === 'no_balance') { me.balance = r.balance; return alert('رصيدك مش كفاية لاشتراك 30 يوم، اشحن الأول.') }
     return blockedView(r.reason);
   }
@@ -717,6 +728,7 @@ async function adminView() {
   const rows = Array.isArray(list) ? list : [];
   const {data: pa} = await sb.rpc('admin_list_pending_accounts');
   const accs = Array.isArray(pa) ? pa : [];
+  const {data: s30a} = await sb.rpc('get_sub30'); const cur30 = (s30a && s30a.mode) || 'p40';
   app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات إنشاء الحساب (${accs.length})</h2>
     ${accs.map(a => `<div class="card"><b>${esc(a.name)}</b> — ${yName(+a.year)}<br><span dir="ltr">${esc(a.phone)}</span><br>
       <small>الجهاز ده اتعمل عليه حساب قبل كده</small>
@@ -729,6 +741,8 @@ async function adminView() {
       <div class="row"><button class="btn ok" data-a="approve" data-id="${r.id}">✔ قبول</button>
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
     <button class="link" id="rf2">تحديث</button></div>
+    <div class="card"><h2>📅 سعر اشتراك 30 يوم</h2>
+      <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '40'], ['p30', '30 بدل <s>40</s>']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
     <div class="card"><h2>🪙 إضافة عملات لطالب</h2>
       <input id="cp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="ca" inputmode="numeric" dir="ltr" placeholder="عدد العملات (سالب = خصم)">
       <div class="row"><button class="btn ok" id="cg" type="button">إضافة</button></div><p class="msg" id="cm"></p></div>
@@ -736,6 +750,11 @@ async function adminView() {
       <input id="rp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="rw" dir="ltr" placeholder="كلمة السر الجديدة (6 على الأقل)">
       <div class="row"><button class="btn" id="rg" type="button">🎲 توليد</button><button class="btn" id="rr" type="button">تغيير</button></div><p class="msg" id="rm"></p></div>`;
   bindTop();
+  pick('#s30m', async v => {
+    $('#s30msg').textContent = '...';
+    const {data, error} = await sb.rpc('admin_set_sub30', {p_mode: v});
+    $('#s30msg').textContent = error || !data || !data.ok ? 'حصلت مشكلة، السعر ماتغيّرش' : 'تم الحفظ ✅';
+  });
   on('#rf2', adminView); on('#bk2', enter);
   document.querySelectorAll('[data-ac]').forEach(b => b.onclick = async () => {
     const ap = b.dataset.ac === 'approve';
@@ -780,10 +799,10 @@ async function adminView() {
 }
 
 async function walletView(forced) {
-  view = 'wallet'; let amt = 60;
+  view = 'wallet'; let amt = 60; await loadSub30();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>3</b> <i class="coin"></i></div><div class="card">
-    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم بـ 60 <i class="coin"></i></small><button class="btn" id="b30">اشترك 30 يوم بـ 60 <i class="coin"></i></button></div><p class="pay-info">${linkTG(PAY_INFO)}</p>
+    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
     <div class="row" id="am">${[10, 20, 50, 60].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
