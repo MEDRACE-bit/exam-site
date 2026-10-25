@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn:disabled{opacity:.5}
 .ic{display:inline-block;width:38px;height:38px;vertical-align:middle;margin-inline-end:10px}.ic svg,.ic img{width:100%;height:100%;display:block;object-fit:contain}
 .btn.ok{background:#1f7a3d}.btn.no{background:#555}
-.link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}.pay-info a,.blk a{color:#ffd54a;font-weight:700;text-decoration:underline}
+.link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}.rrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}.rrow .rbox{margin:0}.pay-info a,.blk a{color:#ffd54a;font-weight:700;text-decoration:underline}
 .back{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #c0262d;color:#ffd0d0;border-radius:14px;padding:8px 18px;margin:8px 0;font:inherit;font-weight:700;cursor:pointer}.back:active{background:#3a1c1c}.bar .back{margin:0}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
 .tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
@@ -91,7 +91,7 @@ const on = (s, f) => { const e = $(s); if (e) e.onclick = f };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g, '');
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
-let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null;
+let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null, shuffled = false;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 
 function accMsg(e) {
@@ -644,6 +644,7 @@ function savedTypes(k) {
     loading();
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
+    shuffled = false;
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
     fromSaved = true;
     const first = qs.findIndex(x => !answered[x.id]);
@@ -663,7 +664,7 @@ async function startQuiz(f) {
     return q.order('id');
   });
   if (res.error) { alert(accMsg(res.error)); return sectionsView() }
-  qs = res.data; fromSaved = false;
+  qs = res.data; fromSaved = false; shuffled = false;
   const first = qs.findIndex(x => !answered[x.id]);
   i = first < 0 ? 0 : first;
   quizView();
@@ -679,9 +680,9 @@ function quizView() {
   }
   const a = answered[q.id];
   app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
-    <div class="card"><small>${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
+    <div class="card"><small>${shuffled ? '🔀 ترتيب عشوائي · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
-    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><button class="link rbox" id="rs">🔄 حل من الأول</button>`;
+    <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><div class="rrow"><button class="link rbox" id="rs">🔄 حل من الأول</button><button class="link rbox" id="sh">🔀 لخبط الأسئلة</button></div>`;
   bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
   on('#rs', async () => {
     if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
@@ -690,6 +691,11 @@ function quizView() {
     const {error} = await sb.rpc('reset_progress', {qids: ids});
     if (error) { if (btn) btn.disabled = false; return alert('حصلت مشكلة، حاول تاني') }
     ids.forEach(id => { delete answered[id] }); i = 0; quizView();
+  });
+  on('#sh', () => {
+    for (let k = qs.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [qs[k], qs[j]] = [qs[j], qs[k]] }
+    shuffled = true;
+    const f0 = qs.findIndex(x => !answered[x.id]); i = f0 < 0 ? 0 : f0; quizView();
   });
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
