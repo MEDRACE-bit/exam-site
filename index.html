@@ -510,7 +510,7 @@ function subjectsView(y, block) {
   const list = subs.filter(x => x.year === y && x.block === curBlock);
   let html = topBar() + BK('‹ البلوكات') + crumb() + '<h2>' + esc(curBlock) + '</h2>';
   if (!list.length) html += '<p>لسه مفيش مواد</p>';
-  list.forEach(x => { html += '<button class="sub" data-id="' + x.id + '">' + icon(x.name) + '<b>' + esc(x.name) + '</b></button>' });
+  list.forEach(x => { html += '<button class="sub" data-id="' + x.id + '"><b>' + esc(x.name) + '</b></button>' });
   app.innerHTML = html; bindTop(); on('#bk', () => blocksView(curYear));
   document.querySelectorAll('.sub').forEach(b => b.onclick = () => lecturesView(subs.find(x => x.id === +b.dataset.id)));
 }
@@ -526,7 +526,7 @@ async function lecturesView(sub) {
     loading();
     const {data: ls, error: le} = await sb.rpc('list_lectures', {sid: sub.id});
     metaFor = null;
-    let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
+    let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
     else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
@@ -551,7 +551,7 @@ async function lecturesView(sub) {
   const card = (k, t, arr) => {
     return '<div class="lrow"><button class="sub lec" data-k="' + esc(k) + '"><b>' + esc(t) + '</b><br><small>' + solvedIn(arr) + ' / ' + arr.length + ' سؤال</small>' + bar(solvedIn(arr), arr.length) + '</button></div>';
   };
-  let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + (pracMode ? 'PRACTICAL - ' : '') + esc(sub.name) + '</h2>';
+  let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + (pracMode ? 'PRACTICAL - ' : '') + esc(sub.name) + '</h2>';
   if (!Object.keys(groups).length) html += '<p>لسه مفيش أسئلة في ' + (pracMode ? 'العملي ده' : 'المادة دي') + '</p>';
   else {
     Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
