@@ -754,7 +754,7 @@ async function adminView() {
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
     <button class="link" id="rf2">تحديث</button></div>
     <div class="card"><h2>📅 سعر اشتراك 30 يوم</h2>
-      <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '40'], ['p30', '30 بدل <s>40</s>']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
+      <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '45'], ['p30', '30 بدل <s>45</s>']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
     <div class="card"><h2>🪙 إضافة عملات لطالب</h2>
       <input id="cp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="ca" inputmode="numeric" dir="ltr" placeholder="عدد العملات (سالب = خصم)">
       <div class="row"><button class="btn ok" id="cg" type="button">إضافة</button></div><p class="msg" id="cm"></p></div>
