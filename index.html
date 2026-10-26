@@ -573,7 +573,7 @@ async function lecturesView(sub) {
 }
 
 // تصنيفات بتتعرض بين قوسين جنب MCQ/Written بدل ما تبقى قسم لوحدها
-const AUTHOR_TAGS = ['DR DINA'];
+const AUTHOR_TAGS = ['DR DINA', 'FORMATIVE'];
 // 5) question sections of a lecture: all / important / by source / by type
 function sectionsView(k) {
   if (k === undefined) k = curLec;
@@ -584,9 +584,11 @@ function sectionsView(k) {
   if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
   Array.from(new Set(arr.map(q => q.source_tag).filter(t => t && !AUTHOR_TAGS.includes(t)))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   ['mcq', 'written'].forEach(t => {
-    const a2 = arr.filter(q => q.type === t);
-    const au = Array.from(new Set(a2.map(q => q.source_tag).filter(x => AUTHOR_TAGS.includes(x)))).join(' + ');
-    if (a2.length) secs.push({t: (t === 'mcq' ? 'MCQ' : 'Written') + (au ? ' (' + au + ')' : ''), f: {type: t}, a: a2});
+    const a2 = arr.filter(q => q.type === t), nm = t === 'mcq' ? 'MCQ' : 'Written';
+    const aus = Array.from(new Set(a2.map(q => q.source_tag).filter(x => AUTHOR_TAGS.includes(x))));
+    const plain = a2.filter(q => !AUTHOR_TAGS.includes(q.source_tag));
+    if (plain.length) secs.push({t: nm, f: aus.length ? {type: t, nosrc: 1} : {type: t}, a: plain});
+    aus.forEach(au => secs.push({t: nm + ' (' + au + ')', f: {type: t, src: au}, a: a2.filter(q => q.source_tag === au)}));
   });
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
@@ -596,7 +598,7 @@ function sectionsView(k) {
   document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
     const sc = secs[+b.dataset.n];
     if (sc.saved) return savedTypes(k);
-    if (sc.f.type && !sc.f.src && sc.a.some(q => q.is_key_point)) return typeKeyView(sc, k);
+    if (sc.f.type && sc.a.some(q => q.is_key_point)) return typeKeyView(sc, k);
     startQuiz(sc.f);
   });
 }
@@ -605,7 +607,7 @@ function sectionsView(k) {
 function typeKeyView(sc, k) {
   view = 'keytypes';
   const keyA = sc.a.filter(q => q.is_key_point);
-  const opts = [{t: 'كل الأسئلة', f: {type: sc.f.type}, a: sc.a}, {t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: {key: 1, type: sc.f.type}, a: keyA}];
+  const opts = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}, {t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({key: 1}, sc.f), a: keyA}];
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
     opts.map((x, n) => '<button class="sub kty" data-n="' + n + '"><b>' + esc(x.t) + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
   bindTop(); on('#bk', () => sectionsView(k));
@@ -663,6 +665,7 @@ async function startQuiz(f) {
     if (curLec !== LEC_ALL) q = curLec ? q.eq('chapter', curLec) : q.is('chapter', 'null');
     if (f.key) q = q.eq('is_key_point', 'true');
     if (f.src) q = q.eq('source_tag', f.src);
+    if (f.nosrc) q = q.is('source_tag', 'null');
     if (f.type) q = q.eq('type', f.type);
     return q.order('id');
   });
