@@ -572,6 +572,8 @@ async function lecturesView(sub) {
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
 }
 
+// تصنيفات بتتعرض بين قوسين جنب MCQ/Written بدل ما تبقى قسم لوحدها
+const AUTHOR_TAGS = ['DR DINA'];
 // 5) question sections of a lecture: all / important / by source / by type
 function sectionsView(k) {
   if (k === undefined) k = curLec;
@@ -580,10 +582,11 @@ function sectionsView(k) {
   const secs = [];
   const mySaved = arr.filter(q => saved.has(q.id));
   if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
-  Array.from(new Set(arr.map(q => q.source_tag).filter(Boolean))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
+  Array.from(new Set(arr.map(q => q.source_tag).filter(t => t && !AUTHOR_TAGS.includes(t)))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t);
-    if (a2.length) secs.push({t: t === 'mcq' ? 'MCQ' : 'Written', f: {type: t}, a: a2});
+    const au = Array.from(new Set(a2.map(q => q.source_tag).filter(x => AUTHOR_TAGS.includes(x)))).join(' + ');
+    if (a2.length) secs.push({t: (t === 'mcq' ? 'MCQ' : 'Written') + (au ? ' (' + au + ')' : ''), f: {type: t}, a: a2});
   });
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
