@@ -19,7 +19,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .link{background:none;border:0;color:#e88;padding:6px}.link.rbox{display:block;margin:12px auto 0;padding:9px 22px;border:1.5px solid #e88;border-radius:14px}.rrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}.rrow .rbox{margin:0}.pay-info a,.blk a{color:#ffd54a;font-weight:700;text-decoration:underline}
 .back{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #c0262d;color:#ffd0d0;border-radius:14px;padding:8px 18px;margin:8px 0;font:inherit;font-weight:700;cursor:pointer}.back:active{background:#3a1c1c}.bar .back{margin:0}
 .pill{background:#3a1c1c;border:0;border-radius:20px;padding:6px 12px}
-.tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:default}
+.tbar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#102b17;border:1px solid #1f6b36;color:#8be6a5;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.95em}.tbar b{font-variant-numeric:tabular-nums;direction:ltr;display:inline-block}.tbar.lock{background:#2b1010;border-color:#7a2323;color:#ffb3b3}.tbar .btn{margin:0;width:auto;padding:8px 14px}.sub.locked{opacity:.6;cursor:pointer}
+.lkm{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}.lkc{max-width:340px;width:100%;text-align:center}.lkc .btn{width:100%;margin:8px 0}
 .note{background:#10202b;border:1px solid #1f5f7a;color:#a8dcf5;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:.92em;line-height:1.7}.note a{color:#ffd54a;font-weight:700;text-decoration:underline}
 .rate{background:#2b2410;border:1px solid #6b5410;color:#ffd54a;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:.9em;text-align:center}
 .coin{display:inline-block;width:1.15em;height:1.15em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f2b900 60%,#b98300);border:2px solid #ffd54a;box-shadow:inset 0 0 0 2px #c99400;vertical-align:-.2em;margin-left:4px;position:relative}
@@ -234,8 +235,18 @@ setInterval(() => {
     expiredFired = true; alert('الاشتراك خلص، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
   }
 }, 1000);
-async function buyAccess() {
-  if (!confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
+function lockedPrompt() {
+  if (document.getElementById('lkm')) return;
+  const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
+  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b><p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p><button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
+  document.body.appendChild(d);
+  const close = () => d.remove();
+  d.onclick = e => { if (e.target === d) close() };
+  document.getElementById('lk0').onclick = close;
+  document.getElementById('lk1').onclick = () => { close(); buyAccess(true) };
+}
+async function buyAccess(skip) {
+  if (skip !== true && !confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
   const {data: r, error} = await sb.rpc('buy_access');
   if (error || !r) return alert('حصلت مشكلة، حاول تاني');
   if (!r.ok) return r.reason === 'no_balance' ? (me.balance = r.balance, walletView(true)) : blockedView(r.reason);
@@ -543,8 +554,9 @@ async function lecturesView(sub) {
     let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
-    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<div class="sub locked"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></div>' });
+    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
+    document.querySelectorAll('.lkb').forEach(b => b.onclick = lockedPrompt);
     return;
   }
   if (metaFor !== sub.id) {
