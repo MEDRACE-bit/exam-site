@@ -53,6 +53,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}.sub.prac.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed}
 h3{margin:16px 0 4px;color:#e88}
 
+.soonmsg{text-align:center;font-weight:700;font-size:1.2rem;padding:10px;margin:8px 0;border:1px dashed #c0262d;border-radius:12px;color:#ffb3b6}
 .row button.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed;background:#1b0d0d}.row button.soon small{color:#e88}
 .sub30{margin:12px 0;padding:12px;border:1px solid #c0262d;border-radius:12px;background:#1b0d0d;line-height:1.8}
 .sub30 .btn{margin-top:8px}
@@ -331,7 +332,7 @@ function blockedView(r) {
 
 const LEC_ALL = '__all__';
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
-const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation']);
+const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
@@ -814,7 +815,7 @@ async function adminView() {
 async function walletView(forced) {
   view = 'wallet'; let amt = 60; await loadSub30();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
-  app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card">
+  app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="soonmsg">🔜 قريباً</div><div class="card" style="opacity:.4;filter:grayscale(1);pointer-events:none;user-select:none">
     ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
     <div class="row" id="am">${[10, 20, 50, 60].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
