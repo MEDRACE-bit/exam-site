@@ -816,7 +816,7 @@ async function walletView(forced) {
   view = 'wallet'; let amt = 60; await loadSub30();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="soonmsg">🔜 قريباً</div><div class="card" style="opacity:.4;filter:grayscale(1);pointer-events:none;user-select:none">
-    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
+    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${s30Box()}
     <div class="row" id="am">${[10, 20, 50, 60].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
