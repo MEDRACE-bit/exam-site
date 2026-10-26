@@ -2,6 +2,6 @@
 window.APP_CONFIG = {
   url: "https://ckdumaoivcymzkhddezg.supabase.co",
   key: "sb_publishable_EWDmsuM_ga7MrZeNDHpd4Q_vreRM5QZ",
-  payInfo: " حوّل المبلغ على فودافون كاش:01069149002 (ب اسم محمود م ) ثم ارسل ايصال التحويل الينا عبر تيلجرام@MEDRACESU.",
+  payInfo: " حوّل المبلغ على فودافون كاش(اختار المحفظة لو بتحول من انستا باي) على الرقم:01010334024 ( الاسم: محمود م ) ثم ارسل ايصال التحويل الينا عبر تيلجرام@MEDRACESU.",
   support: "@MEDRACESU"
 };
