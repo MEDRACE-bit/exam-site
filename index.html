@@ -58,6 +58,7 @@ h3{margin:16px 0 4px;color:#e88}
 .row button.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed;background:#1b0d0d}.row button.soon small{color:#e88}
 .sub30{margin:12px 0;padding:12px;border:1px solid #c0262d;border-radius:12px;background:#1b0d0d;line-height:1.8}
 .sub30 .btn{margin-top:8px}
+.sub30.f7{border-color:#1f6b36;background:#0e1f13}.tbar.f7b{background:#0e1f13;border-color:#1f6b36}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text}
 img{-webkit-user-drag:none;pointer-events:none}
@@ -226,11 +227,12 @@ function pick(sel, cb) {
 let accessUntil = 0, expiredFired = false;
 const unlocked = () => !!(me && me.is_admin) || accessUntil > Date.now();
 const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
-const accessBar = () => (me && me.is_admin) ? '' : accessUntil > Date.now()
+const accessBar = () => f7Bar() + ((me && me.is_admin) ? '' : accessUntil > Date.now()
   ? (view !== 'home' && view !== 'blocks') ? '' : '<div class="tbar">⏱ الأسئلة مفتوحة، المتبقي: <b id="tm">' + fmtT(accessUntil - Date.now()) + '</b></div>'
-  : '<div class="tbar lock">🔒 الأسئلة مقفولة <button class="btn" id="bu">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button></div>';
+  : '<div class="tbar lock">🔒 الأسئلة مقفولة <button class="btn" id="bu">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button></div>');
 setInterval(() => {
   const e = $('#tm'); if (e) e.textContent = fmtT(accessUntil - Date.now());
+  const f7e = $('#f7t'); if (f7e) { if (f7Left() <= 0) { free7.active = false; if (me && !me.is_admin && view !== 'admin') enter() } else f7e.textContent = fmtT(f7Left()) }
   if (accessUntil && accessUntil <= Date.now() && !expiredFired && me && !me.is_admin && view !== 'auth' && view !== 'blocked') {
     expiredFired = true; alert('الاشتراك خلص، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
   }
@@ -238,12 +240,13 @@ setInterval(() => {
 function lockedPrompt() {
   if (document.getElementById('lkm')) return;
   const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
-  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b><p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p><button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
+  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b><p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>' + (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') + '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
   document.body.appendChild(d);
   const close = () => d.remove();
   d.onclick = e => { if (e.target === d) close() };
   document.getElementById('lk0').onclick = close;
   document.getElementById('lk1').onclick = () => { close(); buyAccess(true) };
+  const lf = document.getElementById('lkf'); if (lf) lf.onclick = () => { close(); claimFree7() };
 }
 async function buyAccess(skip) {
   if (skip !== true && !confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
@@ -275,12 +278,32 @@ async function buy30() {
   me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
   alert('تم تفعيل اشتراك 30 يوم ✅'); enter();
 }
+let free7 = {active: false, claimed: false, end: 0};
+async function loadFree7() {
+  if (!me || me.is_admin) { free7 = {active: false, claimed: false, end: 0}; return }
+  const {data} = await sb.rpc('get_free7');
+  free7 = data && data.active ? {active: true, claimed: !!data.claimed, end: Date.now() + data.remaining * 1000} : {active: false, claimed: false, end: 0};
+}
+const f7Left = () => Math.max(0, free7.end - Date.now());
+const f7On = () => free7.active && f7Left() > 0;
+const f7Box = () => !f7On() ? '' : free7.claimed
+  ? '<div class="sub30 f7"><b>🎁 عرض 7 أيام مجاني</b><br><small>أنت استلمت العرض ✅</small></div>'
+  : '<div class="sub30 f7"><b>🎁 7 أيام مجاني!</b><br><small>العرض ينتهي بعد: <b id="f7t">' + fmtT(f7Left()) + '</b></small><button class="btn" id="bf7">🎁 فعّل 7 أيام مجاني</button></div>';
+const f7Bar = () => (f7On() && !free7.claimed && me && !me.is_admin && (view === 'home' || view === 'blocks'))
+  ? '<div class="tbar f7b">🎁 عرض 7 أيام مجاني، ينتهي بعد <b id="f7t">' + fmtT(f7Left()) + '</b> <button class="btn" id="bf7">فعّل</button></div>' : '';
+async function claimFree7() {
+  const {data: r, error} = await sb.rpc('claim_free7');
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) { await loadFree7(); alert(r.reason === 'claimed' ? 'انت استلمت العرض ده قبل كده' : r.reason === 'ended' ? 'العرض خلص' : 'حصلت مشكلة'); return enter() }
+  accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null; free7.claimed = true;
+  alert('تم تفعيل 7 أيام مجاني ✅'); enter();
+}
 const BK = t => '<button class="back" id="bk">' + t + '</button>';
 const topBar = () => `<div class="top"><b>${esc(me.name)}</b><span>${me.is_admin ? '<button class="pill" id="ad">🛠 الطلبات</button> ' : ''}<button class="pill" id="wl"><i class="coin"></i>${me.balance}</button><button class="link" id="lo">خروج</button></span></div>` + accessBar();
 function bindTop() {
   on('#ad', () => adminView());
   on('#wl', () => walletView());
-  on('#bu', buyAccess);
+  on('#bu', buyAccess); on('#bf7', claimFree7);
   on('#lo', async () => { if (!confirm('متأكد إنك عايز تخرج من حسابك؟')) return; await sb.auth.signOut(); authView(false) });
 }
 
@@ -327,6 +350,7 @@ async function enter() {
   const {data: r} = await sb.rpc('my_access');
   if (!r || !r.ok) return blockedView(r && r.reason);
   me.balance = r.balance; accessUntil = r.remaining > 0 ? Date.now() + r.remaining * 1000 : 0; expiredFired = false;
+  await loadFree7();
   homeView();
 }
 
@@ -755,6 +779,7 @@ async function adminView() {
   const {data: pa} = await sb.rpc('admin_list_pending_accounts');
   const accs = Array.isArray(pa) ? pa : [];
   const {data: s30a} = await sb.rpc('get_sub30'); const cur30 = (s30a && s30a.mode) || 'p40';
+  const {data: f7s} = await sb.rpc('admin_free7_status'); const f7a = f7s && f7s.active, f7end = Date.now() + ((f7s && f7s.remaining) || 0) * 1000;
   app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات إنشاء الحساب (${accs.length})</h2>
     ${accs.map(a => `<div class="card"><b>${esc(a.name)}</b> — ${yName(+a.year)}<br><span dir="ltr">${esc(a.phone)}</span><br>
       <small>الجهاز ده اتعمل عليه حساب قبل كده</small>
@@ -769,6 +794,9 @@ async function adminView() {
     <button class="link" id="rf2">تحديث</button></div>
     <div class="card"><h2>📅 سعر اشتراك 30 يوم</h2>
       <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '45'], ['p30', '30 بدل <s>45</s>']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
+    <div class="card"><h2>🎁 عرض 7 أيام مجاني</h2>
+      <p>${f7a ? 'العرض شغال، ينتهي بعد: <b id="f7at">' + fmtT(f7end - Date.now()) + '</b><br>اللي استلموه: <b>' + (f7s.claims || 0) + '</b>' : 'العرض متوقف'}</p>
+      <div class="row"><button class="btn ok" id="f7go" type="button">${f7a ? '🔄 ابدأ عرض جديد 24 ساعة' : '▶ ابدأ العرض 24 ساعة'}</button>${f7a ? '<button class="btn no" id="f7off" type="button">⏹ إيقاف</button>' : ''}</div><p class="msg" id="f7m"></p></div>
     <div class="card"><h2>🪙 إضافة عملات لطالب</h2>
       <input id="cp" inputmode="tel" dir="ltr" placeholder="رقم تليفون الطالب"><input id="ca" inputmode="numeric" dir="ltr" placeholder="عدد العملات (سالب = خصم)">
       <div class="row"><button class="btn ok" id="cg" type="button">إضافة</button></div><p class="msg" id="cm"></p></div>
@@ -782,6 +810,15 @@ async function adminView() {
     $('#s30msg').textContent = error || !data || !data.ok ? 'حصلت مشكلة، السعر ماتغيّرش' : 'تم الحفظ ✅';
   });
   on('#rf2', adminView); on('#bk2', enter);
+  if (f7a) { const t = setInterval(() => { const e = $('#f7at'); if (!e || view !== 'admin') return clearInterval(t); const l = f7end - Date.now(); if (l <= 0) { clearInterval(t); adminView() } else e.textContent = fmtT(l) }, 1000) }
+  const f7set = async on_ => {
+    if (!confirm(on_ ? 'هيظهر لكل الطلاب عرض 7 أيام مجاني لمدة 24 ساعة. متأكد؟' : 'تقفل العرض دلوقتي؟')) return;
+    $('#f7m').textContent = '...';
+    const {data, error} = await sb.rpc('admin_set_free7', {p_on: on_});
+    if (error || !data || !data.ok) return $('#f7m').textContent = 'حصلت مشكلة، العرض ماتغيّرش';
+    adminView();
+  };
+  on('#f7go', () => f7set(true)); on('#f7off', () => f7set(false));
   document.querySelectorAll('[data-ac]').forEach(b => b.onclick = async () => {
     const ap = b.dataset.ac === 'approve';
     if (!confirm(ap ? 'تأكيد تفعيل الحساب؟' : 'تأكيد رفض الحساب؟')) return;
@@ -825,10 +862,10 @@ async function adminView() {
 }
 
 async function walletView(forced) {
-  view = 'wallet'; let amt = 60; await loadSub30();
+  view = 'wallet'; let amt = 60; await loadSub30(); await loadFree7();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card">
-    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
+    ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${f7Box()}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
     <div class="row" id="am">${[10, 20, 50, 60].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
