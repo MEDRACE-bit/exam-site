@@ -766,19 +766,23 @@ function folderView(fid) {
 function folderPicker(q) {
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.78);overflow:auto;padding:14px';
+  const inAny = () => folders.some(f => fitems[f.id].has(q.id));
+  const sync = () => { const d = ov.querySelector('#fpc'); if (d) d.disabled = !inAny() };
   const close = () => { ov.remove(); const st = $('#st'); if (st) st.textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ' };
   const render = () => {
     ov.innerHTML = '<div class="card" style="max-width:520px;margin:16px auto"><h2>📁 أضف السؤال لقسم</h2>' +
       (folders.length ? folders.map(f => '<label style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #3a1c1c"><input type="checkbox" data-id="' + f.id + '" style="width:auto;margin:0"' + (fitems[f.id].has(q.id) ? ' checked' : '') + '><span>' + esc(f.name) + '</span></label>').join('') : '<p>لسه معندكش أقسام، اعمل أول قسم:</p>') +
-      '<input id="fpn" maxlength="40" placeholder="اسم قسم جديد"><div class="row"><button class="btn ok" id="fpa" type="button">➕ إنشاء وإضافة</button><button class="btn no" id="fpc" type="button">تم</button></div></div>';
+      '<input id="fpn" maxlength="40" placeholder="اسم قسم جديد"><div class="row"><button class="btn ok" id="fpa" type="button">➕ إنشاء وإضافة</button><button class="btn no" id="fpc" type="button"' + (inAny() ? '' : ' disabled') + '>تم</button></div><button class="link" id="fpx" type="button" style="margin-top:10px">إلغاء</button></div>';
     ov.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = async () => {
       const id = cb.dataset.id, want = cb.checked; cb.disabled = true;
       const {data, error} = await sb.rpc('folder_set', {p_folder: +id, p_question: q.id, p_on: want});
       cb.disabled = false;
       if (error || !data || !data.ok) { cb.checked = !want; return alert('حصلت مشكلة، حاول تاني') }
       if (want) { fitems[id].add(q.id); saved.add(q.id) } else fitems[id].delete(q.id);
+      sync();
     });
-    ov.querySelector('#fpc').onclick = close;
+    ov.querySelector('#fpc').onclick = () => { if (inAny()) close() };
+    ov.querySelector('#fpx').onclick = close;
     ov.querySelector('#fpa').onclick = async () => {
       const f = await folderCreate(ov.querySelector('#fpn').value); if (!f) return;
       const {data, error} = await sb.rpc('folder_set', {p_folder: +f.id, p_question: q.id, p_on: true});
