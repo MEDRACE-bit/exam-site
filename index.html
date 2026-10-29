@@ -107,6 +107,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\s+/g, '');
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null, shuffled = false;
+let folders = [], fitems = {}, foldersOk = false, fromFolder = null;
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 
 function accMsg(e) {
@@ -598,15 +599,20 @@ async function lecturesView(sub) {
   }
   if (metaFor !== sub.id) {
     loading();
-    const [m, a, b] = await Promise.all([
+    const [m, a, b, fo, fi] = await Promise.all([
       fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
       fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
-      sb.from('bookmarks').select('question_id')
+      sb.from('bookmarks').select('question_id'),
+      fetchAll(() => sb.from('saved_folders').select('id,name,subject_id').eq('subject_id', sub.id).order('id')),
+      fetchAll(() => sb.from('saved_folder_items').select('folder_id,question_id').order('folder_id').order('question_id'))
     ]);
     if (m.error) { alert(accMsg(m.error)); return backFromLec() }
     meta = m.data; answered = {};
     (a.data || []).forEach(x => answered[x.question_id] = x);
     saved = new Set((b.data || []).map(x => x.question_id));
+    foldersOk = !fo.error && !fi.error; folders = foldersOk ? fo.data : []; fitems = {};
+    folders.forEach(f => { fitems[f.id] = new Set() });
+    if (foldersOk) fi.data.forEach(x => { if (fitems[x.folder_id]) fitems[x.folder_id].add(x.question_id) });
     metaFor = sub.id;
   }
   const groups = {};
@@ -694,18 +700,93 @@ function savedTypes(k) {
   const secs = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
-    secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
+    secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('') +
+    (foldersOk ? '<h3 style="margin:18px 0 4px">📁 أقسامي</h3>' +
+      folders.map(f => '<button class="sub fld" data-id="' + f.id + '"><b>📁 ' + esc(f.name) + '</b><br><small>' + fitems[f.id].size + ' سؤال</small></button>').join('') +
+      '<button class="btn ok" id="nf" type="button">➕ قسم جديد</button>' : '');
   bindTop(); on('#bk', () => sectionsView(k));
+  document.querySelectorAll('.fld').forEach(b => b.onclick = () => folderView(b.dataset.id));
+  on('#nf', async () => { const f = await folderCreate(prompt('اسم القسم الجديد؟')); if (f) savedTypes(k) });
   document.querySelectorAll('.svt').forEach(b => b.onclick = async () => {
     loading();
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
     if (res.error) { alert('حصلت مشكلة، حاول تاني'); return savedTypes(k) }
-    shuffled = false;
+    shuffled = false; fromFolder = null;
     qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
     fromSaved = true;
     const first = qs.findIndex(x => !answered[x.id]);
     i = first < 0 ? 0 : first; quizView();
   });
+}
+
+// ===== أقسام المحفوظات =====
+async function folderCreate(name) {
+  name = String(name || '').trim().slice(0, 40); if (!name) return null;
+  const {data, error} = await sb.rpc('folder_create', {p_subject: curSub.id, p_name: name});
+  if (error || !data || !data.ok) {
+    alert(data && data.error === 'exists' ? 'القسم ده موجود بالفعل' : data && data.error === 'limit' ? 'وصلت للحد الأقصى من الأقسام' : 'حصلت مشكلة، اتأكد إنك شغّلت saved_folders.sql');
+    return null;
+  }
+  const f = {id: data.id, name, subject_id: curSub.id}; folders.push(f); fitems[f.id] = new Set(); return f;
+}
+function folderView(fid) {
+  const f = folders.find(x => String(x.id) === String(fid)); if (!f) return savedTypes(savedLec);
+  view = 'folder'; fromSaved = false;
+  const mine = meta.filter(q => fitems[f.id].has(q.id));
+  const secs = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
+  app.innerHTML = topBar() + BK('‹ المحفوظات') + crumb() + '<h2>📁 ' + esc(f.name) + '</h2>' +
+    (secs.length ? secs.map((x, n) => '<button class="sub fvt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('')
+      : '<p>القسم فاضي. افتح أي سؤال محفوظ واضغط 📁 عشان تضيفه هنا.</p>') +
+    '<div class="row"><button id="fr" type="button">✏️ تغيير الاسم</button><button id="fd" type="button">🗑 حذف القسم</button></div>';
+  bindTop(); on('#bk', () => savedTypes(savedLec));
+  document.querySelectorAll('.fvt').forEach(b => b.onclick = async () => {
+    loading();
+    const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
+    if (res.error) { alert('حصلت مشكلة، حاول تاني'); return folderView(f.id) }
+    shuffled = false; fromFolder = f.id;
+    qs = res.data.slice().sort((p, q) => chOf(p).localeCompare(chOf(q), 'ar', {numeric: true}) || p.id - q.id);
+    fromSaved = true;
+    const first = qs.findIndex(x => !answered[x.id]);
+    i = first < 0 ? 0 : first; quizView();
+  });
+  on('#fr', async () => {
+    const nm = String(prompt('اسم القسم الجديد؟', f.name) || '').trim().slice(0, 40); if (!nm || nm === f.name) return;
+    const {data, error} = await sb.rpc('folder_rename', {p_id: f.id, p_name: nm});
+    if (error || !data || !data.ok) return alert(data && data.error === 'exists' ? 'فيه قسم بنفس الاسم' : 'حصلت مشكلة، حاول تاني');
+    f.name = nm; folderView(f.id);
+  });
+  on('#fd', async () => {
+    if (!confirm('تحذف القسم "' + f.name + '"؟ الأسئلة المحفوظة هتفضل محفوظة.')) return;
+    const {data, error} = await sb.rpc('folder_delete', {p_id: f.id});
+    if (error || !data || !data.ok) return alert('حصلت مشكلة، حاول تاني');
+    folders = folders.filter(x => x.id !== f.id); delete fitems[f.id]; savedTypes(savedLec);
+  });
+}
+// نافذة اختيار الأقسام للسؤال الحالي (لو السؤال مش محفوظ بيتحفظ لما تضيفه لقسم)
+function folderPicker(q) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.78);overflow:auto;padding:14px';
+  const close = () => { ov.remove(); const st = $('#st'); if (st) st.textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ' };
+  const render = () => {
+    ov.innerHTML = '<div class="card" style="max-width:520px;margin:16px auto"><h2>📁 أضف السؤال لقسم</h2>' +
+      (folders.length ? folders.map(f => '<label style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #3a1c1c"><input type="checkbox" data-id="' + f.id + '" style="width:auto;margin:0"' + (fitems[f.id].has(q.id) ? ' checked' : '') + '><span>' + esc(f.name) + '</span></label>').join('') : '<p>لسه معندكش أقسام، اعمل أول قسم:</p>') +
+      '<input id="fpn" maxlength="40" placeholder="اسم قسم جديد"><div class="row"><button class="btn ok" id="fpa" type="button">➕ إنشاء وإضافة</button><button class="btn no" id="fpc" type="button">تم</button></div></div>';
+    ov.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = async () => {
+      const id = cb.dataset.id, want = cb.checked; cb.disabled = true;
+      const {data, error} = await sb.rpc('folder_set', {p_folder: +id, p_question: q.id, p_on: want});
+      cb.disabled = false;
+      if (error || !data || !data.ok) { cb.checked = !want; return alert('حصلت مشكلة، حاول تاني') }
+      if (want) { fitems[id].add(q.id); saved.add(q.id) } else fitems[id].delete(q.id);
+    });
+    ov.querySelector('#fpc').onclick = close;
+    ov.querySelector('#fpa').onclick = async () => {
+      const f = await folderCreate(ov.querySelector('#fpn').value); if (!f) return;
+      const {data, error} = await sb.rpc('folder_set', {p_folder: +f.id, p_question: q.id, p_on: true});
+      if (!error && data && data.ok) { fitems[f.id].add(q.id); saved.add(q.id) }
+      render();
+    };
+  };
+  render(); document.body.appendChild(ov);
 }
 
 // 6) load the chosen section and start the quiz
@@ -736,11 +817,11 @@ function quizView() {
     bindTop(); on('#bk', () => sectionsView()); return;
   }
   const a = answered[q.id];
-  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button></div>
+  app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button>${foldersOk ? ' <button class="svb" id="fl" type="button">📁</button>' : ''}</span></div>
     <div class="card"><small>${shuffled ? '🔀 ترتيب عشوائي · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
     <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><div class="rrow"><button class="link rbox" id="rs">🔄 حل من الأول</button><button class="link rbox" id="sh">🔀 لخبط الأسئلة</button></div>`;
-  bindTop(); on('#bk', () => fromSaved ? savedTypes() : sectionsView()); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  bindTop(); on('#bk', () => fromSaved ? (fromFolder ? folderView(fromFolder) : savedTypes()) : sectionsView()); on('#fl', () => folderPicker(q)); on('#pv', () => go(-1)); on('#nx', () => go(1));
   on('#rs', async () => {
     if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
     const btn = $('#rs'); if (btn) btn.disabled = true;
@@ -755,7 +836,7 @@ function quizView() {
     const f0 = qs.findIndex(x => !answered[x.id]); i = f0 < 0 ? 0 : f0; quizView();
   });
   on('#st', async () => {
-    if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id) }
+    if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id); Object.keys(fitems).forEach(k => fitems[k].delete(q.id)) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
     $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ';
   });
