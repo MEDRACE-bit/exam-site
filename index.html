@@ -65,6 +65,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 #pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-sv{padding:13px 12px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
 
 .sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}.sub.prac.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed}
+.lr3 .blk{flex:2;min-width:0}.lr3 .stb,.lr3 .prac,.lr3 .lsp{flex:1;min-width:0}.lr3 .sub.stb,.lr3 .sub.prac{padding:12px 3px;text-align:center;font-size:.82em;display:flex;flex-direction:column;justify-content:center;word-break:break-word}.lsp{margin:8px 0}
+.lr3 .sub.prac b{font-size:.74em;letter-spacing:-.2px}.lr3 .sub.prac small{font-size:.7em}
+.sub.stb{background:#2a2108;border-color:#e0a526;color:#fff2cf}.sub.stb small{color:#f0cf7a}
+.ch.sel{border-color:#e0a526;background:#2a2108}
+.stc{display:flex;gap:10px;align-items:center;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stc input{width:18px;height:18px;margin:0;padding:0;flex:none;accent-color:#c0262d}.stc small{margin-inline-start:auto;opacity:.75;white-space:nowrap}.stc.off{opacity:.4}.stsh{margin:12px 2px 2px;font-weight:700;opacity:.85}
+.stg{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.stg button{width:34px;height:34px;padding:0;border-radius:8px;border:1px solid #3a1c1c;background:#1b0d0d;font-size:.85em}.stg .dn{background:#2a2108;border-color:#e0a526}.stg .cu{outline:2px solid #fff}
+.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}
 h3{margin:16px 0 4px;color:#e88}
 
 .soonmsg{text-align:center;font-weight:700;font-size:1.2rem;padding:10px;margin:8px 0;border:1px dashed #c0262d;border-radius:12px;color:#ffb3b6}
@@ -468,18 +475,198 @@ function blocksView(y) {
     const c = list.filter(x => x.block === b).length;
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
-    html += pk
-      ? '<div class="lrow">' + bt + (pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button></div>' : '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button></div>')
-      : bt;
+    const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
+    const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
+    html += '<div class="lrow lr3">' + bt + stb + pb + '</div>';
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
   document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => { if (pb.dataset.pk === 'bio') { const sb1 = subs.find(x => x.year === 1 && x.block === 'Biochemistry'); if (!sb1) return alert('لسه مفيش عملي'); curBlock = 'Biochemistry'; pracMode = true; lecturesView(sb1) } else practicalView(pb.dataset.pk) });
+  document.querySelectorAll('.stb').forEach(b => b.onclick = () => stHome(y, blocks[+b.dataset.n]));
   document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
   });
 }
 
+
+// ====== اختبر نفسك: اختبار عشوائي من أسئلة البلوك (30 ثانية للسؤال) ======
+const ST_SEC = 30;
+const stKey = () => 'selftest_' + (me ? me.id : '');
+const stLoad = () => { try { const a = JSON.parse(ls.get(stKey()) || '[]'); return Array.isArray(a) ? a : [] } catch (e) { return [] } };
+const stSaveAll = a => ls.set(stKey(), JSON.stringify(a.slice(0, 300)));
+const stShuf = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]] } return a };
+const stDur = s => { s = Math.round(s); const m = Math.floor(s / 60), r = s % 60; return m ? m + ' دقيقة' + (r ? ' و' + r + ' ثانية' : '') : r + ' ثانية' };
+const stClock = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') };
+const stDate = t => { const d = new Date(t); return d.toLocaleDateString('ar-EG') + ' ' + d.toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'}) };
+let stTimer = null, stEx = null, stCfg = {};
+const stStop = () => { if (stTimer) { clearInterval(stTimer); stTimer = null } };
+
+async function stHome(y, block) {
+  if (!unlocked()) return lockedPrompt();
+  stStop(); stEx = null;
+  view = 'selftest'; curYear = y; curBlock = block; curSub = null; curLec = null;
+  loading();
+  const bsubs = subs.filter(x => x.year === y && x.block === block), ids = bsubs.map(x => x.id);
+  const [m, a] = await Promise.all([
+    fetchAll(() => sb.from('questions').select('id,chapter,is_key_point,subject_id').eq('type', 'mcq').inList('subject_id', ids).order('id')),
+    fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id'))
+  ]);
+  if (m.error) { alert(accMsg(m.error)); return blocksView(y) }
+  const att = {}; (a.data || []).forEach(x => { att[x.question_id] = x });
+  const chs = {};
+  (m.data || []).forEach(q => { const c = chOf(q); if (isPrac(c)) return; const k = q.subject_id + '||' + c; (chs[k] = chs[k] || {k, sid: q.subject_id, name: c, qs: []}).qs.push(q) });
+  const sName = id => (bsubs.find(s => s.id === id) || {}).name || '';
+  const list = Object.values(chs).sort((p, q) => sName(p.sid).localeCompare(sName(q.sid), 'ar') || p.name.localeCompare(q.name, 'ar', {numeric: true}));
+  stCfg = {mode: 'all', checked: new Set(list.map(c => c.k)), n: 20};
+  const keyQs = c => c.qs.filter(q => q.is_key_point);
+  const cnt = c => stCfg.mode === 'key' ? keyQs(c).length : c.qs.length;
+  const solved = c => c.qs.filter(q => att[q.id]).length;
+  const pool = () => list.filter(c => stCfg.checked.has(c.k)).flatMap(c => stCfg.mode === 'key' ? keyQs(c) : c.qs);
+  const setMode = md => {
+    let sel;
+    if (md === 'done') { sel = list.filter(c => solved(c) > 0); if (!sel.length) return alert('لسه محلتش أي أسئلة في البلوك ده') }
+    else if (md === 'key') { sel = list.filter(c => keyQs(c).length); if (!sel.length) return alert('مفيش أسئلة مهمة في البلوك ده') }
+    else sel = list;
+    stCfg.mode = md; stCfg.checked = new Set(sel.map(c => c.k)); render();
+  };
+  const timeTxt = () => { const n = Math.max(0, Math.min(stCfg.n, pool().length)); return '⏳ مدة الاختبار: <b>' + stDur(n * ST_SEC) + '</b> (' + n + ' × ' + ST_SEC + ' ثانية)' };
+  const startExam = async n => {
+    const p = stShuf(pool().slice()).slice(0, n);
+    loading();
+    const r = await fetchByIds(p.map(q => q.id));
+    const qs2 = r.error ? [] : stShuf(r.data.filter(q => Array.isArray(q.choices) && q.choices.length));
+    if (!qs2.length) { alert(r.error ? accMsg(r.error) : 'مفيش أسئلة متاحة'); return render() }
+    stEx = {qs: qs2, ans: {}, i: 0, secs: qs2.length * ST_SEC, t0: Date.now(), y, block, att, saved: false};
+    stEx.end = stEx.t0 + stEx.secs * 1000;
+    stStop(); stTimer = setInterval(stTick, 1000); stExamView();
+  };
+  function render() {
+    view = 'selftest';
+    const av = pool().length; stCfg.n = Math.max(1, Math.min(stCfg.n, av || 1));
+    let h = topBar() + BK('‹ البلوكات') + '<h2>📝 اختبر نفسك</h2><div class="crumb">' + esc(yName(y)) + ' › ' + esc(block) + '</div>';
+    if (!list.length) h += '<p>لسه مفيش أسئلة اختيارية (MCQ) في البلوك ده</p>';
+    else {
+      h += '<div class="svh">اختار الأسئلة</div><div class="row" id="stmodes">' +
+        [['all', 'كل الأسئلة'], ['key', '⭐ المهم'], ['done', '✔ اللي حليتها']].map(([v, t]) => '<button type="button" class="stm' + (stCfg.mode === v ? ' on' : '') + '" data-m="' + v + '">' + t + '</button>').join('') + '</div>' +
+        '<div class="svh">الأقسام <button type="button" class="link" id="sta" style="float:left;padding:0">' + (stCfg.checked.size === list.length ? 'إلغاء الكل' : 'تحديد الكل') + '</button></div>';
+      let lastS = null;
+      list.forEach((c, n) => {
+        if (bsubs.length > 1 && c.sid !== lastS) { lastS = c.sid; h += '<div class="stsh">' + esc(sName(c.sid)) + '</div>' }
+        const k = cnt(c);
+        h += '<label class="stc' + (k ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (k ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + (stCfg.mode === 'key' ? k + ' مهم' : solved(c) + ' / ' + k + ' محلول') + '</small></label>';
+      });
+      h += '<div class="svh">عدد الأسئلة <small>(المتاح: ' + av + ')</small></div>' +
+        '<input type="number" id="stn" inputmode="numeric" min="1" max="' + av + '" value="' + stCfg.n + '" style="text-align:center;font-weight:700">' +
+        '<div class="card" id="stt2" style="text-align:center">' + timeTxt() + '</div>' +
+        '<button class="btn" id="stg"' + (av ? '' : ' disabled') + '>▶ ابدأ الاختبار</button>';
+    }
+    const hist = stLoad().filter(r => r.year === y && r.block === block);
+    if (hist.length) {
+      h += '<div class="svh">📊 نتايجك المحفوظة' + (hist.length > 1 ? ' <button type="button" class="link" id="sthc" style="float:left;padding:0">مسح الكل</button>' : '') + '</div>' +
+        hist.map(r => '<div class="stH"><div><b dir="ltr">' + r.correct + ' / ' + r.total + ' (' + r.pct + '%)</b><br><small>' + stDate(r.at) + ' · ' + stClock(r.used) + ' من ' + stClock(r.secs) + (r.skipped ? ' · ' + r.skipped + ' متجاوبش' : '') + '</small></div><button type="button" class="btn no sth" data-id="' + r.id + '" title="حذف">🗑</button></div>').join('');
+    }
+    app.innerHTML = h; bindTop(); on('#bk', () => blocksView(y));
+    document.querySelectorAll('.stm').forEach(b => b.onclick = () => setMode(b.dataset.m));
+    document.querySelectorAll('.stcb').forEach(b => b.onchange = () => { const c = list[+b.dataset.n]; b.checked ? stCfg.checked.add(c.k) : stCfg.checked.delete(c.k); render() });
+    on('#sta', () => { stCfg.checked = stCfg.checked.size === list.length ? new Set() : new Set(list.filter(c => cnt(c)).map(c => c.k)); render() });
+    const ni = $('#stn'); if (ni) ni.oninput = () => { stCfg.n = Math.max(1, Math.min(+ni.value || 1, pool().length || 1)); const t = $('#stt2'); if (t) t.innerHTML = timeTxt() };
+    on('#stg', () => { const av2 = pool().length; if (!av2) return alert('اختار قسم واحد على الأقل'); const n = Math.max(1, Math.min(+($('#stn').value) || stCfg.n, av2)); stCfg.n = n; startExam(n) });
+    on('#sthc', () => { if (!confirm('تمسح كل نتايج الاختبارات المحفوظة للبلوك ده؟')) return; stSaveAll(stLoad().filter(r => !(r.year === y && r.block === block))); render() });
+    document.querySelectorAll('.sth').forEach(b => b.onclick = () => { if (!confirm('تحذف النتيجة دي؟')) return; stSaveAll(stLoad().filter(r => String(r.id) !== b.dataset.id)); render() });
+  }
+  stCfg.back = render;
+  render();
+}
+
+function stTick() {
+  if (view !== 'stexam' || !stEx) return stStop();
+  const left = Math.ceil((stEx.end - Date.now()) / 1000);
+  const e = $('#stt'); if (e) { e.textContent = stClock(left); const bx = $('#stbx'); if (bx) bx.classList.toggle('lock', left <= 60) }
+  if (left <= 0) stFinish(true);
+}
+
+function stExamView() {
+  view = 'stexam'; const E = stEx, q = E.qs[E.i];
+  const done = Object.keys(E.ans).length, left = Math.ceil((E.end - Date.now()) / 1000);
+  app.innerHTML = topBar() + '<div class="tbar' + (left <= 60 ? ' lock' : '') + '" id="stbx">⏳ الوقت المتبقي: <b id="stt">' + stClock(left) + '</b></div>' +
+    '<div class="bar"><button class="back" id="bk">‹ إلغاء</button><span>' + (E.i + 1) + ' / ' + E.qs.length + '</span><span><small>اتحل ' + done + '</small></span></div>' +
+    '<div class="card"><small>' + esc(q.chapter || '') + '</small><p class="q" dir="auto">' + esc(q.body) + '</p>' +
+    q.choices.map((c, k) => '<button class="ch' + (E.ans[q.id] === k ? ' sel' : '') + '" data-k="' + k + '" dir="auto"><b>' + 'ABCDE'[k] + '.</b> ' + esc(c) + '</button>').join('') + '</div>' +
+    '<div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div>' +
+    '<div class="stg">' + E.qs.map((x, n) => '<button type="button" data-n="' + n + '" class="' + (E.ans[x.id] !== undefined ? 'dn ' : '') + (n === E.i ? 'cu' : '') + '">' + (n + 1) + '</button>').join('') + '</div>' +
+    '<button class="btn" id="stf">✅ إنهاء الاختبار</button>';
+  bindTop();
+  on('#bk', () => { if (!confirm('هتخرج من الاختبار وهيتلغي من غير نتيجة. متأكد؟')) return; stStop(); stEx = null; stHome(E.y, E.block) });
+  on('#pv', () => { E.i = Math.max(0, E.i - 1); stExamView() });
+  on('#nx', () => { E.i = Math.min(E.qs.length - 1, E.i + 1); stExamView() });
+  document.querySelectorAll('.stg button').forEach(b => b.onclick = () => { E.i = +b.dataset.n; stExamView() });
+  document.querySelectorAll('.card .ch').forEach(b => b.onclick = () => { const k = +b.dataset.k; if (E.ans[q.id] === k) delete E.ans[q.id]; else E.ans[q.id] = k; stExamView() });
+  on('#stf', () => {
+    const left2 = E.qs.length - Object.keys(E.ans).length;
+    if (left2 && !confirm('لسه ' + left2 + ' سؤال ماتجاوبش. تنهي الاختبار؟')) return;
+    stFinish(false);
+  });
+}
+
+// التصحيح: الأسئلة اللي اتحلت قبل كده بنجيب مفتاحها، والجديدة بتتسجل في تقدمك عادي
+async function stGrade(q, k, att) {
+  const key = async () => { const r = await sb.rpc('get_answer_key', {qid: q.id}); return (r.error || !r.data) ? null : r.data.correct_index };
+  if (!att[q.id]) {
+    const r = await sb.rpc('submit_answer', {qid: q.id, idx: k});
+    if (!r.error && r.data) { answered[q.id] = {chosen_index: k, is_correct: r.data.is_correct}; return {c: r.data.correct_index} }
+  }
+  const c = await key(); return c == null ? null : {c};
+}
+
+async function stFinish(auto) {
+  const E = stEx; if (!E || E.busy) return; E.busy = true; stStop(); view = 'stgrade';
+  const used = Math.min(E.secs, Math.round((Date.now() - E.t0) / 1000));
+  app.innerHTML = topBar() + '<p style="padding:24px;text-align:center">' + (auto ? '⏰ الوقت خلص! ' : '') + 'جاري التصحيح...</p>'; bindTop();
+  const items = E.qs.filter(q => E.ans[q.id] !== undefined), res = {};
+  let p = 0;
+  const worker = async () => { while (p < items.length) { const q = items[p++]; res[q.id] = await stGrade(q, E.ans[q.id], E.att) } };
+  await Promise.all([worker(), worker(), worker(), worker(), worker()]);
+  metaFor = null;
+  let ok = 0, bad = 0, skip = 0, err = 0; const wrong = [];
+  E.qs.forEach(q => {
+    const c = E.ans[q.id], r = res[q.id];
+    if (c === undefined) skip++;
+    else if (!r) err++;
+    else if (c === r.c) ok++;
+    else { bad++; wrong.push({q, c, r: r.c}) }
+  });
+  const graded = E.qs.length - err;
+  E.result = {id: Date.now(), at: new Date().toISOString(), year: E.y, block: E.block, total: E.qs.length, correct: ok, wrong: bad, skipped: skip, used, secs: E.secs, pct: E.qs.length ? Math.round(100 * ok / E.qs.length) : 0};
+  stResultView(wrong, err, auto);
+}
+
+function stResultView(wrong, err, auto) {
+  view = 'stresult'; const E = stEx, r = E.result;
+  const col = r.pct >= 75 ? '#2e9e5b' : r.pct >= 50 ? '#e0a526' : '#d64545';
+  const ch = (q, k) => k === undefined || !q.choices[k] ? '—' : 'ABCDE'[k] + '. ' + esc(q.choices[k]);
+  app.innerHTML = topBar() + BK('‹ اختبر نفسك') + '<h2>📝 نتيجة الاختبار</h2>' +
+    (auto ? '<div class="card" style="text-align:center">⏰ الوقت خلص واتسلّمت إجاباتك تلقائي</div>' : '') +
+    '<div class="card" style="text-align:center"><div style="font-size:2.6em;font-weight:800;color:' + col + '" dir="ltr">' + r.pct + '%</div>' +
+    '<div dir="ltr"><b>' + r.correct + ' / ' + r.total + '</b></div>' +
+    '<div style="margin-top:8px">✅ صح: <b>' + r.correct + '</b> · ❌ غلط: <b>' + r.wrong + '</b> · ⏭ متجاوبش: <b>' + r.skipped + '</b></div>' +
+    '<small>⏱ الوقت المستخدم ' + stClock(r.used) + ' من ' + stClock(r.secs) + '</small>' +
+    (err ? '<div style="color:#e88;margin-top:6px"><small>⚠ ' + err + ' سؤال ماتصححوش (مشكلة اتصال) ومش محسوبين صح</small></div>' : '') + '</div>' +
+    '<div class="row"><button type="button" id="stsv">💾 حفظ النتيجة</button><button type="button" id="stdl">🗑 حذف النتيجة</button></div>' +
+    '<button class="btn" id="stnw">📝 اختبار جديد</button>' +
+    (wrong.length ? '<div class="svh">❌ الأسئلة الغلط (' + wrong.length + ')</div>' + wrong.map(w => '<div class="card"><p class="q" dir="auto">' + esc(w.q.body) + '</p><div class="ch bad" dir="auto">إجابتك: ' + ch(w.q, w.c) + '</div><div class="ch ok" dir="auto">الصح: ' + ch(w.q, w.r) + '</div></div>').join('') : '');
+  bindTop();
+  const back = () => { stEx = null; stHome(E.y, E.block) };
+  on('#bk', () => { if (!E.saved && !confirm('النتيجة لسه ماتحفظتش. تخرج من غير حفظ؟')) return; back() });
+  on('#stnw', () => { if (!E.saved && !confirm('النتيجة لسه ماتحفظتش. تكمل من غير حفظ؟')) return; back() });
+  const sv = $('#stsv'), paint = () => { if (sv) { sv.textContent = E.saved ? '✔ اتحفظت' : '💾 حفظ النتيجة'; sv.disabled = E.saved } };
+  paint();
+  on('#stsv', () => { if (E.saved) return; const a = stLoad(); a.unshift(r); stSaveAll(a); E.saved = true; paint() });
+  on('#stdl', () => {
+    if (!confirm('تحذف النتيجة دي؟')) return;
+    if (E.saved) stSaveAll(stLoad().filter(x => x.id !== r.id));
+    back();
+  });
+}
 
 // PRACTICAL (anatomy practical) - images are served from Supabase only to accounts with active access
 const PZ = {anat: {tbl: 'practical_slides', name: 'عملي التشريح'}, histo: {tbl: 'practical_histo', name: 'عملي الهستولوجي'}};
