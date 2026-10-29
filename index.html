@@ -799,9 +799,16 @@ async function quizResultView() {
   bindTop(); on('#bk', back);
   const list = await qrLoad();
   app.innerHTML = topBar() + BK('‹ رجوع') + '<h2>🏆 Quiz Result</h2>' +
-    (list.length ? list.map(x => '<button class="sub qrq" data-id="' + x.id + '"><b>' + esc(x.title) + '</b><br><small>' + new Date(x.at).toLocaleDateString('ar-EG') + '</small></button>').join('') : '<p>لسه مفيش نتايج اختبارات</p>');
+    (list.length ? list.map(x => '<div style="display:flex;gap:8px;align-items:stretch"><button class="sub qrq" style="flex:1" data-id="' + x.id + '"><b>' + esc(x.title) + '</b><br><small>' + new Date(x.at).toLocaleDateString('ar-EG') + '</small></button>' + (me.is_admin ? '<button class="btn no qrd" style="width:auto;margin:0;padding:0 16px" type="button" data-id="' + x.id + '" title="حذف">🗑</button>' : '') + '</div>').join('') : '<p>لسه مفيش نتايج اختبارات</p>');
   bindTop(); on('#bk', back);
   document.querySelectorAll('.qrq').forEach(b => b.onclick = () => qrShow(list.find(x => String(x.id) === b.dataset.id)));
+  document.querySelectorAll('.qrd').forEach(b => b.onclick = async () => {
+    const x = list.find(v => String(v.id) === b.dataset.id);
+    if (!x || !confirm('تحذف نتيجة "' + x.title + '"؟')) return;
+    const {data, error} = await sb.rpc('admin_delete_quiz_result', {p_id: String(x.id)});
+    if (error || !data || !data.ok) return alert('حصلت مشكلة: ' + ((error && error.message) || (data && data.error) || ''));
+    quizResultView();
+  });
 }
 function qrShow(r) {
   view = 'quizres';
