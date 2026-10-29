@@ -525,7 +525,11 @@ async function stHome(y, block) {
   // أقسام الطالب (المحفوظات): بناخد منها أسئلة الاختياري اللي في البلوك ده بس
   const fMap = {}; (fi.data || []).forEach(x => { (fMap[x.folder_id] = fMap[x.folder_id] || new Set()).add(x.question_id) });
   const okQ = (m.data || []).filter(q => !isPrac(chOf(q)));
-  const myF = (fr.error ? [] : (fr.data || [])).map(f => ({id: String(f.id), name: f.name, sid: f.subject_id, qs: okQ.filter(q => fMap[f.id] && fMap[f.id].has(q.id))}));
+  const myF = (fr.error ? [] : (fr.data || [])).map(f => {
+    const fq = okQ.filter(q => fMap[f.id] && fMap[f.id].has(q.id));
+    const lecs = Array.from(new Set(fq.map(q => lecName(chOf(q))))).sort((p, q) => p.localeCompare(q, 'ar', {numeric: true}));
+    return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, lab: lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : ''};
+  });
   stCfg = {mode: 'all', checked: new Set(), fchecked: new Set(), n: 20};
   const keyQs = c => c.qs.filter(q => q.is_key_point);
   const savedQs = c => c.qs.filter(q => sv.has(q.id));
@@ -582,7 +586,7 @@ async function stHome(y, block) {
         h += '<label class="stc' + (k ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (k ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + (sm ? k + ' محفوظ' : stCfg.mode === 'key' ? k + ' مهم' : solved(c) + ' / ' + k + ' محلول') + '</small></label>';
       });
       if (sm && myF.length) {
-        h += '<div class="svh">📁 أقسامي</div>' + myF.map(f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.name) + (bsubs.length > 1 ? ' · ' + esc(sName(f.sid)) : '') + '</span><small>' + f.qs.length + ' سؤال</small></label>').join('');
+        h += '<div class="svh">📁 أقسامي</div>' + myF.map(f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + (bsubs.length > 1 ? ' · ' + esc(sName(f.sid)) : '') + '</span>' : (bsubs.length > 1 ? ' · ' + esc(sName(f.sid)) : '')) + '</span><small>' + f.qs.length + ' سؤال</small></label>').join('');
       }
       h += '<div class="svh">عدد الأسئلة <small>(المتاح: ' + av + ')</small></div>' +
         '<input type="number" id="stn" inputmode="numeric" min="1" max="' + av + '" value="' + stCfg.n + '" style="text-align:center;font-weight:700">' +
