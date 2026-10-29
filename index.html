@@ -528,7 +528,10 @@ async function stHome(y, block) {
   const myF = (fr.error ? [] : (fr.data || [])).map(f => {
     const fq = okQ.filter(q => fMap[f.id] && fMap[f.id].has(q.id));
     const lecs = Array.from(new Set(fq.map(q => lecName(chOf(q))))).sort((p, q) => p.localeCompare(q, 'ar', {numeric: true}));
-    return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, lab: f.chapter ? lecName(f.chapter) : (lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : '')};
+    const cc = {}; fq.forEach(q => { const k = chOf(q); cc[k] = (cc[k] || 0) + 1 });
+    const dom = Object.keys(cc).sort((p, q) => cc[q] - cc[p])[0] || '';
+    const ch = f.chapter ? String(f.chapter).trim() : dom;   // لو القسم لسه مش مربوط بنفترض محاضرته من أسئلته
+    return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, ch, lab: ch ? lecName(ch) : (lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : '')};
   });
   stCfg = {mode: 'all', checked: new Set(), fchecked: new Set(), open: new Set(), n: 20};
   const keyQs = c => c.qs.filter(q => q.is_key_point);
@@ -585,10 +588,10 @@ async function stHome(y, block) {
       const fRow = f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + '</span>' : '') + '</span><small>' + f.qs.length + ' سؤال</small></label>';
       if (sm) {
         // المحفوظات: مادة مادة، وتحت كل مادة المحاضرة بسهم يفتح: المحفوظ العادي وبعده أقسام الطالب
-        const fOf = c => myF.filter(f => f.sid === c.sid && f.chapter === c.name);
+        const fOf = c => myF.filter(f => f.sid === c.sid && f.ch === c.name);
         const fRow2 = f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.name) + '</span><small>' + f.qs.length + ' سؤال</small></label>';
         const rows = list.map((c, n) => ({c, n})).filter(r => savedQs(r.c).length || fOf(r.c).length);
-        const lone = myF.filter(f => !list.some(c => c.sid === f.sid && c.name === f.chapter));
+        const lone = myF.filter(f => !list.some(c => c.sid === f.sid && c.name === f.ch));
         const sids = Array.from(new Set(rows.map(r => r.c.sid).concat(lone.map(f => f.sid)))).sort((p, q) => sName(p).localeCompare(sName(q), 'ar'));
         sids.forEach(sid => {
           h += '<div class="stsh">' + esc(sName(sid)) + '</div>';
@@ -633,7 +636,7 @@ async function stHome(y, block) {
       b.onchange = () => {
         const c = list[+b.dataset.n], o = b.checked;
         if (c.qs.some(q => sv.has(q.id))) o ? stCfg.checked.add(c.k) : stCfg.checked.delete(c.k);
-        myF.filter(f => f.sid === c.sid && f.chapter === c.name && f.qs.length).forEach(f => o ? stCfg.fchecked.add(f.id) : stCfg.fchecked.delete(f.id));
+        myF.filter(f => f.sid === c.sid && f.ch === c.name && f.qs.length).forEach(f => o ? stCfg.fchecked.add(f.id) : stCfg.fchecked.delete(f.id));
         keep();
       };
     });
@@ -1029,6 +1032,7 @@ function savedTypes(k) {
 async function fetchFolders(mk) {
   let r = await fetchAll(() => mk('id,name,subject_id,chapter'));
   if (r.error) r = await fetchAll(() => mk('id,name,subject_id'));   // لو عمود chapter لسه ماتضافش
+  if (!r.error && Array.isArray(r.data)) r.data = r.data.map(x => Object.assign({}, x, {chapter: x.chapter ? String(x.chapter).trim() : null}));
   return r;
 }
 async function folderCreate(name, chapter) {
