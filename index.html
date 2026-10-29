@@ -859,13 +859,13 @@ function qrAdminBind(list) {
     const ws = els.map((el, i) => ({name: el.querySelector('.qn').value.trim(), score: el.querySelector('.qs').value.trim(), photo: ph[i] || ''}));
     $('#qm').textContent = '...';
     const {data, error} = await sb.rpc('admin_save_quiz_result', {p_id: cur ? cur.id : null, p_title: t, p_winners: ws});
-    if (error || !data || !data.ok) return $('#qm').textContent = 'حصلت مشكلة، اتأكد إنك شغّلت quiz_results.sql';
+    if (error || !data || !data.ok) return $('#qm').textContent = 'حصلت مشكلة: ' + ((error && (error.message + (error.status ? ' [' + error.status + ']' : ''))) || (data && data.error) || 'مفيش رد من السيرفر');
     alert('تم الحفظ ✅'); adminView();
   });
   on('#qdel', async () => {
     if (!cur || !confirm('تحذف نتيجة "' + cur.title + '"؟')) return;
     const {data, error} = await sb.rpc('admin_delete_quiz_result', {p_id: cur.id});
-    if (error || !data || !data.ok) return $('#qm').textContent = 'حصلت مشكلة';
+    if (error || !data || !data.ok) return $('#qm').textContent = 'حصلت مشكلة: ' + ((error && error.message) || (data && data.error) || '');
     adminView();
   });
 }
