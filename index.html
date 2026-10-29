@@ -45,6 +45,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .row{display:flex;gap:6px;margin:6px 0}
 .row button{flex:1;padding:10px;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}
 .row .on{background:#c0262d;border-color:#c0262d}
+.cprow{display:flex;gap:8px;align-items:center}.cprow input{margin:6px 0;text-align:center;font-weight:700;letter-spacing:1px;direction:ltr}.cprow .btn{width:auto;margin:0;padding:12px 18px;white-space:nowrap}.lbl{display:block;margin-top:10px;font-size:.92em;opacity:.85}
 .msg{color:#e88;min-height:1.2em}
 .q{font-size:18px;line-height:1.7}
 .ml{margin:6px 0;line-height:1.8}.ml.pt{margin-inline-start:6px}.svb{color:#fff;background:#241212;border:1px solid #c0262d;border-radius:10px;padding:8px 12px}.svh{margin:14px 0 4px;color:#e88;font-weight:700}.svs{margin:8px 0 2px;color:#aaa;font-size:13px}.sqi{display:block;width:100%;text-align:start;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d;line-height:1.6}
@@ -1056,13 +1057,29 @@ async function walletView(forced) {
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card">
     ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${f7Box()}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
+    <label class="lbl">حوّل على الرقم ده (فودافون كاش)</label>
+    <div class="cprow"><input id="pn" value="01010334024" readonly dir="ltr" inputmode="none"><button class="btn" id="cp">نسخ</button></div>
+    <label class="lbl">عايز تشحن كام؟</label>
     <div class="row" id="am">${[10, 20, 50, 60].map(a => `<button data-v="${a}" class="${a === 60 ? 'on' : ''}">${a}</button>`).join('')}</div>
+    <input id="av" type="number" inputmode="numeric" min="1" step="1" value="60" placeholder="اكتب المبلغ اللي عايز تشحنه">
+    <label class="lbl">رقم العملية</label>
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
     <button class="link rbox" id="rf">تحديث الرصيد</button></div>` +
     (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
-  bindTop(); pick('#am', v => amt = +v);
+  bindTop(); pick('#am', v => { amt = +v; $('#av').value = v });
+  $('#av').oninput = () => {
+    amt = Math.floor(+$('#av').value) || 0;
+    document.querySelectorAll('#am button').forEach(x => x.classList.toggle('on', +x.dataset.v === amt));
+  };
+  on('#cp', async () => {
+    const i = $('#pn'), b = $('#cp');
+    try { await navigator.clipboard.writeText(i.value) }
+    catch (e) { i.select(); i.setSelectionRange(0, 99); try { document.execCommand('copy') } catch (e2) {} }
+    b.textContent = 'تم النسخ ✔'; setTimeout(() => b.textContent = 'نسخ', 1500);
+  });
   on('#sd', async () => {
+    if (!Number.isInteger(amt) || amt < 1) return $('#m').textContent = 'اكتب مبلغ صحيح الأول';
     const {error} = await sb.from('topup_requests').insert({user_id: me.id, amount: amt, method: 'فودافون كاش', proof_note: $('#pf').value.trim()});
     $('#m').textContent = error ? 'حصلت مشكلة، حاول تاني' : 'تم إرسال الطلب، هيتراجع ويتضاف الرصيد';
   });
