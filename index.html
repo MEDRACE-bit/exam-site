@@ -586,7 +586,7 @@ async function stHome(y, block) {
         h += '<label class="stc' + (k ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (k ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + (sm ? k + ' محفوظ' : stCfg.mode === 'key' ? k + ' مهم' : solved(c) + ' / ' + k + ' محلول') + '</small></label>';
       });
       if (sm && myF.length) {
-        h += '<div class="svh">📁 أقسامي</div>' + myF.map(f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + (bsubs.length > 1 ? ' · ' + esc(sName(f.sid)) : '') + '</span>' : (bsubs.length > 1 ? ' · ' + esc(sName(f.sid)) : '')) + '</span><small>' + f.qs.length + ' سؤال</small></label>').join('');
+        h += '<div class="svh">📁 أقسامي</div>' + myF.map(f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(sName(f.sid)) + ' › ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + '</span>' : '') + '</span><small>' + f.qs.length + ' سؤال</small></label>').join('');
       }
       h += '<div class="svh">عدد الأسئلة <small>(المتاح: ' + av + ')</small></div>' +
         '<input type="number" id="stn" inputmode="numeric" min="1" max="' + av + '" value="' + stCfg.n + '" style="text-align:center;font-weight:700">' +
