@@ -71,7 +71,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ch.sel{border-color:#e0a526;background:#2a2108}
 .stc{display:flex;gap:10px;align-items:center;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stc input{width:18px;height:18px;margin:0;padding:0;flex:none;accent-color:#c0262d}.stc small{margin-inline-start:auto;opacity:.75;white-space:nowrap}.stc.off{opacity:.4}.stsh{margin:12px 2px 2px;font-weight:700;opacity:.85}
 .stg{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.stg button{width:34px;height:34px;padding:0;border-radius:8px;border:1px solid #3a1c1c;background:#1b0d0d;font-size:.85em}.stg .dn{background:#2a2108;border-color:#e0a526}.stg .cu{outline:2px solid #fff}
-.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}
+.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}.stl{font-weight:700}.stx{width:auto;margin:0;padding:2px 10px;background:none;border:0;color:#e88;font-size:1.2em}
 h3{margin:16px 0 4px;color:#e88}
 
 .soonmsg{text-align:center;font-weight:700;font-size:1.2rem;padding:10px;margin:8px 0;border:1px dashed #c0262d;border-radius:12px;color:#ffb3b6}
@@ -530,7 +530,7 @@ async function stHome(y, block) {
     const lecs = Array.from(new Set(fq.map(q => lecName(chOf(q))))).sort((p, q) => p.localeCompare(q, 'ar', {numeric: true}));
     return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, lab: f.chapter ? lecName(f.chapter) : (lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : '')};
   });
-  stCfg = {mode: 'all', checked: new Set(), fchecked: new Set(), n: 20};
+  stCfg = {mode: 'all', checked: new Set(), fchecked: new Set(), open: new Set(), n: 20};
   const keyQs = c => c.qs.filter(q => q.is_key_point);
   const savedQs = c => c.qs.filter(q => sv.has(q.id));
   const vis = () => stCfg.mode === 'saved' ? list.filter(c => savedQs(c).length) : list.filter(c => c.qs.length);
@@ -550,7 +550,7 @@ async function stHome(y, block) {
     return list.filter(c => stCfg.checked.has(c.k)).flatMap(c => stCfg.mode === 'key' ? keyQs(c) : c.qs);
   };
   const setMode = md => {
-    stCfg.mode = md; stCfg.fchecked = new Set();
+    stCfg.mode = md; stCfg.fchecked = new Set(); stCfg.open = new Set();
     if (md === 'saved') {
       if (!selC().length && !myF.some(f => f.qs.length)) { stCfg.mode = 'all'; return alert('لسه محفظتش أي أسئلة في البلوك ده') }
       stCfg.fchecked = new Set(selF().map(f => f.id));
@@ -584,13 +584,26 @@ async function stHome(y, block) {
       };
       const fRow = f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + '</span>' : '') + '</span><small>' + f.qs.length + ' سؤال</small></label>';
       if (sm) {
-        // المحفوظات: مادة مادة، وتحت كل مادة محاضراتها المحفوظة وبعدها أقسامها
-        const sids = Array.from(new Set(vl.map(c => c.sid).concat(myF.map(f => f.sid)))).sort((p, q) => sName(p).localeCompare(sName(q), 'ar'));
+        // المحفوظات: مادة مادة، وتحت كل مادة المحاضرة بسهم يفتح: المحفوظ العادي وبعده أقسام الطالب
+        const fOf = c => myF.filter(f => f.sid === c.sid && f.chapter === c.name);
+        const fRow2 = f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.name) + '</span><small>' + f.qs.length + ' سؤال</small></label>';
+        const rows = list.map((c, n) => ({c, n})).filter(r => savedQs(r.c).length || fOf(r.c).length);
+        const lone = myF.filter(f => !list.some(c => c.sid === f.sid && c.name === f.chapter));
+        const sids = Array.from(new Set(rows.map(r => r.c.sid).concat(lone.map(f => f.sid)))).sort((p, q) => sName(p).localeCompare(sName(q), 'ar'));
         sids.forEach(sid => {
           h += '<div class="stsh">' + esc(sName(sid)) + '</div>';
-          list.forEach((c, n) => { if (c.sid === sid && vl.includes(c)) h += chRow(c, n) });
-          const fl = myF.filter(f => f.sid === sid);
-          if (fl.length) h += '<div class="svs">📁 أقسامي</div>' + fl.map(fRow).join('');
+          rows.filter(r => r.c.sid === sid).forEach(({c, n}) => {
+            const sq = savedQs(c).length, fs = fOf(c), tot = [], on = [];
+            if (sq) { tot.push(1); if (stCfg.checked.has(c.k)) on.push(1) }
+            fs.filter(f => f.qs.length).forEach(f => { tot.push(1); if (stCfg.fchecked.has(f.id)) on.push(1) });
+            const all = tot.length > 0 && on.length === tot.length, part = on.length > 0 && !all, open = stCfg.open.has(c.k);
+            h += '<div class="stc stl"><input type="checkbox" class="stlm" data-n="' + n + '"' + (all ? ' checked' : '') + (part ? ' data-p="1"' : '') + (tot.length ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + sq + ' محفوظ' + (fs.length ? ' · ' + fs.length + ' 📁' : '') + '</small><button type="button" class="stx" data-n="' + n + '" aria-label="فتح أو قفل">' + (open ? '▲' : '▼') + '</button></div>' +
+              '<div class="stkids" data-n="' + n + '" style="margin-inline-start:20px' + (open ? '' : ';display:none') + '">' +
+              '<label class="stc' + (sq ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (sq ? '' : ' disabled') + '><span>🔖 المحفوظ العادي</span><small>' + sq + ' سؤال</small></label>' +
+              fs.map(fRow2).join('') + '</div>';
+          });
+          const ln = lone.filter(f => f.sid === sid);
+          if (ln.length) h += '<div class="svs">📁 أقسام أخرى</div>' + ln.map(fRow).join('');
         });
       } else {
         let lastS = null;
@@ -613,8 +626,23 @@ async function stHome(y, block) {
     }
     app.innerHTML = h; bindTop(); on('#bk', () => blocksView(y));
     document.querySelectorAll('.stm').forEach(b => b.onclick = () => setMode(b.dataset.m));
-    document.querySelectorAll('.stcb').forEach(b => b.onchange = () => { const c = list[+b.dataset.n]; b.checked ? stCfg.checked.add(c.k) : stCfg.checked.delete(c.k); render() });
-    document.querySelectorAll('.stfb').forEach(b => b.onchange = () => { b.checked ? stCfg.fchecked.add(b.dataset.f) : stCfg.fchecked.delete(b.dataset.f); render() });
+    const keep = () => { const y0 = window.scrollY; render(); window.scrollTo(0, y0) };
+    document.querySelectorAll('.stcb').forEach(b => b.onchange = () => { const c = list[+b.dataset.n]; b.checked ? stCfg.checked.add(c.k) : stCfg.checked.delete(c.k); keep() });
+    document.querySelectorAll('.stlm').forEach(b => {
+      b.indeterminate = b.dataset.p === '1';
+      b.onchange = () => {
+        const c = list[+b.dataset.n], o = b.checked;
+        if (c.qs.some(q => sv.has(q.id))) o ? stCfg.checked.add(c.k) : stCfg.checked.delete(c.k);
+        myF.filter(f => f.sid === c.sid && f.chapter === c.name && f.qs.length).forEach(f => o ? stCfg.fchecked.add(f.id) : stCfg.fchecked.delete(f.id));
+        keep();
+      };
+    });
+    document.querySelectorAll('.stx').forEach(b => b.onclick = () => {
+      const c = list[+b.dataset.n], kid = document.querySelector('.stkids[data-n="' + b.dataset.n + '"]'); if (!kid) return;
+      const o = kid.style.display === 'none'; kid.style.display = o ? '' : 'none'; b.textContent = o ? '▲' : '▼';
+      o ? stCfg.open.add(c.k) : stCfg.open.delete(c.k);
+    });
+    document.querySelectorAll('.stfb').forEach(b => b.onchange = () => { b.checked ? stCfg.fchecked.add(b.dataset.f) : stCfg.fchecked.delete(b.dataset.f); keep() });
     on('#sta', () => { if (allOn()) { stCfg.checked = new Set(); stCfg.fchecked = new Set() } else { stCfg.checked = new Set(selC().map(c => c.k)); stCfg.fchecked = new Set(selF().map(f => f.id)) } render() });
     const ni = $('#stn'); if (ni) ni.oninput = () => { stCfg.n = Math.max(1, Math.min(+ni.value || 1, pool().length || 1)); const t = $('#stt2'); if (t) t.innerHTML = timeTxt() };
     on('#stg', () => { const av2 = pool().length; if (!av2) return alert('اختار قسم واحد على الأقل'); const n = Math.max(1, Math.min(+($('#stn').value) || stCfg.n, av2)); stCfg.n = n; startExam(n) });
