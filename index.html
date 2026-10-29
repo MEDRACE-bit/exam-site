@@ -511,7 +511,7 @@ async function stHome(y, block) {
   const [m, a, fr, fi] = await Promise.all([
     fetchAll(() => sb.from('questions').select('id,chapter,is_key_point,subject_id').eq('type', 'mcq').inList('subject_id', ids).order('id')),
     fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
-    fetchAll(() => sb.from('saved_folders').select('id,name,subject_id').inList('subject_id', ids).order('id')),
+    fetchFolders(c => sb.from('saved_folders').select(c).inList('subject_id', ids).order('id')),
     fetchAll(() => sb.from('saved_folder_items').select('folder_id,question_id').order('folder_id').order('question_id'))
   ]);
   if (m.error) { alert(accMsg(m.error)); return blocksView(y) }
@@ -528,7 +528,7 @@ async function stHome(y, block) {
   const myF = (fr.error ? [] : (fr.data || [])).map(f => {
     const fq = okQ.filter(q => fMap[f.id] && fMap[f.id].has(q.id));
     const lecs = Array.from(new Set(fq.map(q => lecName(chOf(q))))).sort((p, q) => p.localeCompare(q, 'ar', {numeric: true}));
-    return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, lab: lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : ''};
+    return {id: String(f.id), name: f.name, sid: f.subject_id, qs: fq, lab: f.chapter ? lecName(f.chapter) : (lecs.length ? lecs[0] + (lecs.length > 1 ? ' +' + (lecs.length - 1) : '') : '')};
   });
   stCfg = {mode: 'all', checked: new Set(), fchecked: new Set(), n: 20};
   const keyQs = c => c.qs.filter(q => q.is_key_point);
@@ -880,7 +880,7 @@ async function lecturesView(sub) {
       fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
       fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
       sb.from('bookmarks').select('question_id'),
-      fetchAll(() => sb.from('saved_folders').select('id,name,subject_id').eq('subject_id', sub.id).order('id')),
+      fetchFolders(c => sb.from('saved_folders').select(c).eq('subject_id', sub.id).order('id')),
       fetchAll(() => sb.from('saved_folder_items').select('folder_id,question_id').order('folder_id').order('question_id'))
     ]);
     if (m.error) { alert(accMsg(m.error)); return backFromLec() }
@@ -976,14 +976,15 @@ function savedTypes(k) {
   const mine = meta.filter(q => saved.has(q.id) && (k === LEC_ALL || chOf(q) === k));
   const secs = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
+  const fl = foldersOk ? folders.filter(f => k === LEC_ALL || !f.chapter || f.chapter === k) : [];
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>🔖 ' + esc(lecName(k)) + '</h2>' +
     secs.map((x, n) => '<button class="sub svt" data-k="' + n + '"><b>' + x.n + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال محفوظ</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('') +
     (foldersOk ? '<h3 style="margin:18px 0 4px">📁 أقسامي</h3>' +
-      folders.map(f => '<button class="sub fld" data-id="' + f.id + '"><b>📁 ' + esc(f.name) + '</b><br><small>' + fitems[f.id].size + ' سؤال</small></button>').join('') +
-      '<button class="btn ok" id="nf" type="button">➕ قسم جديد</button>' : '');
+      fl.map(f => '<button class="sub fld" data-id="' + f.id + '"><b>📁 ' + esc(f.name) + '</b><br><small>' + fitems[f.id].size + ' سؤال' + (k === LEC_ALL && f.chapter ? ' · ' + esc(lecName(f.chapter)) : '') + '</small></button>').join('') +
+      (k === LEC_ALL ? '<p><small>افتح محاضرة معينة عشان تعمل قسم جديد، كل قسم بيتبع محاضرة واحدة.</small></p>' : '<button class="btn ok" id="nf" type="button">➕ قسم جديد لمحاضرة دي</button>') : '');
   bindTop(); on('#bk', () => sectionsView(k));
   document.querySelectorAll('.fld').forEach(b => b.onclick = () => folderView(b.dataset.id));
-  on('#nf', async () => { const f = await folderCreate(prompt('اسم القسم الجديد؟')); if (f) savedTypes(k) });
+  on('#nf', async () => { const f = await folderCreate(prompt('اسم القسم الجديد؟'), k); if (f) savedTypes(k) });
   document.querySelectorAll('.svt').forEach(b => b.onclick = async () => {
     loading();
     const res = await fetchByIds(secs[+b.dataset.k].a.map(q => q.id));
@@ -997,14 +998,21 @@ function savedTypes(k) {
 }
 
 // ===== أقسام المحفوظات =====
-async function folderCreate(name) {
+async function fetchFolders(mk) {
+  let r = await fetchAll(() => mk('id,name,subject_id,chapter'));
+  if (r.error) r = await fetchAll(() => mk('id,name,subject_id'));   // لو عمود chapter لسه ماتضافش
+  return r;
+}
+async function folderCreate(name, chapter) {
   name = String(name || '').trim().slice(0, 40); if (!name) return null;
   const {data, error} = await sb.rpc('folder_create', {p_subject: curSub.id, p_name: name});
   if (error || !data || !data.ok) {
     alert(data && data.error === 'exists' ? 'القسم ده موجود بالفعل' : data && data.error === 'limit' ? 'وصلت للحد الأقصى من الأقسام' : 'حصلت مشكلة، اتأكد إنك شغّلت saved_folders.sql');
     return null;
   }
-  const f = {id: data.id, name, subject_id: curSub.id}; folders.push(f); fitems[f.id] = new Set(); return f;
+  const f = {id: data.id, name, subject_id: curSub.id, chapter: null};
+  if (chapter && chapter !== LEC_ALL) { try { const b = await sb.rpc('folder_bind', {p_id: +data.id, p_chapter: chapter}); if (!b.error && b.data && b.data.ok) f.chapter = chapter; else f.chapter = chapter } catch (e) { f.chapter = chapter } }
+  folders.push(f); fitems[f.id] = new Set(); return f;
 }
 function folderView(fid) {
   const f = folders.find(x => String(x.id) === String(fid)); if (!f) return savedTypes(savedLec);
@@ -1046,22 +1054,24 @@ function folderPicker(q) {
   const inAny = () => folders.some(f => fitems[f.id].has(q.id));
   const sync = () => { const d = ov.querySelector('#fpc'); if (d) d.disabled = !inAny() };
   const close = () => { ov.remove(); const st = $('#st'); if (st) st.textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ' };
+  const cand = () => folders.filter(f => !f.chapter || f.chapter === chOf(q));
   const render = () => {
     ov.innerHTML = '<div class="card" style="max-width:520px;margin:16px auto"><h2>📁 أضف السؤال لقسم</h2>' +
-      (folders.length ? folders.map(f => '<label style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #3a1c1c"><input type="checkbox" data-id="' + f.id + '" style="width:auto;margin:0"' + (fitems[f.id].has(q.id) ? ' checked' : '') + '><span>' + esc(f.name) + '</span></label>').join('') : '<p>لسه معندكش أقسام، اعمل أول قسم:</p>') +
+      '<small>الأقسام هنا خاصة بمحاضرة السؤال ده بس.</small>' +
+      (cand().length ? cand().map(f => '<label style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #3a1c1c"><input type="checkbox" data-id="' + f.id + '" style="width:auto;margin:0"' + (fitems[f.id].has(q.id) ? ' checked' : '') + '><span>' + esc(f.name) + '</span></label>').join('') : '<p>لسه معندكش أقسام للمحاضرة دي، اعمل أول قسم:</p>') +
       '<input id="fpn" maxlength="40" placeholder="اسم قسم جديد"><div class="row"><button class="btn ok" id="fpa" type="button">➕ إنشاء وإضافة</button><button class="btn no" id="fpc" type="button"' + (inAny() ? '' : ' disabled') + '>تم</button></div><button class="link" id="fpx" type="button" style="margin-top:10px">إلغاء</button></div>';
     ov.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = async () => {
       const id = cb.dataset.id, want = cb.checked; cb.disabled = true;
       const {data, error} = await sb.rpc('folder_set', {p_folder: +id, p_question: q.id, p_on: want});
       cb.disabled = false;
-      if (error || !data || !data.ok) { cb.checked = !want; return alert('حصلت مشكلة، حاول تاني') }
-      if (want) { fitems[id].add(q.id); saved.add(q.id) } else fitems[id].delete(q.id);
+      if (error || !data || !data.ok) { cb.checked = !want; return alert(error && /wrong_lecture/.test(error.message || '') ? 'القسم ده خاص بمحاضرة تانية، مينفعش تضيف له سؤال من المحاضرة دي' : 'حصلت مشكلة، حاول تاني') }
+      if (want) { fitems[id].add(q.id); saved.add(q.id); const ff = folders.find(x => String(x.id) === String(id)); if (ff && !ff.chapter) ff.chapter = chOf(q) } else fitems[id].delete(q.id);
       sync();
     });
     ov.querySelector('#fpc').onclick = () => { if (inAny()) close() };
     ov.querySelector('#fpx').onclick = close;
     ov.querySelector('#fpa').onclick = async () => {
-      const f = await folderCreate(ov.querySelector('#fpn').value); if (!f) return;
+      const f = await folderCreate(ov.querySelector('#fpn').value, chOf(q)); if (!f) return;
       const {data, error} = await sb.rpc('folder_set', {p_folder: +f.id, p_question: q.id, p_on: true});
       if (!error && data && data.ok) { fitems[f.id].add(q.id); saved.add(q.id) }
       render();
