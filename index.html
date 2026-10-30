@@ -390,7 +390,7 @@ function blockedView(r) {
 
 const LEC_ALL = '__all__';
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
-const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation']);
+const PREDICTED_KEY = new Set(['3 - Resting Membrane Potential', '4 - Action Potential', '2 - The Cell Membrane', '1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
