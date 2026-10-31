@@ -467,7 +467,7 @@ function blockedView(r) {
 
 const LEC_ALL = '__all__';
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
-const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation', '5 - Stretch reflexes I & II', '1 - Thinking']);
+const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation', '5 - Stretch reflexes I & II', '1 - Thinking', '3 - Attention']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
@@ -1059,7 +1059,7 @@ function sectionsView(k) {
 function typeKeyView(sc, k) {
   view = 'keytypes';
   const keyA = sc.a.filter(q => q.is_key_point);
-  const opts = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}, {t: PREDICTED_KEY.has(k) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({key: 1}, sc.f), a: keyA}];
+  const opts = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}, {t: (PREDICTED_KEY.has(k) || (curSub && curSub.year === 1 && /^psych/i.test(curSub.block) && /^2 - /.test(k))) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({key: 1}, sc.f), a: keyA}];
   app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
     opts.map((x, n) => '<button class="sub kty" data-n="' + n + '"><b>' + esc(x.t) + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>').join('');
   bindTop(); on('#bk', () => sectionsView(k));
