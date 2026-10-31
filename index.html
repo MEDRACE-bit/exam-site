@@ -266,6 +266,8 @@ async function loadBlockShop() {
   }
 }
 const blockPrice = (y, b) => { const p = blockShop.prices[bkKey(y, b)]; return (p === undefined || isNaN(p)) ? null : p };
+const FREE_FIRST_YEARS = [3];   // الفرق اللي أول محاضرة من كل مادة فيها مجانية
+const isFreeLec = (sub, ch) => FREE_FIRST_YEARS.includes(sub.year) && /^\s*1\s*[-–]/.test(ch || '');
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
 const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b)) || passOn(y, b);
 const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
@@ -279,8 +281,8 @@ setInterval(() => {
     expiredFired = true; alert('الاشتراك خلص، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
   }
 }, 1000);
-function lockedPrompt(y, block, after) {
-  if (typeof y !== 'number') { y = curYear; block = curBlock; after = null }
+function lockedPrompt(y, block, after, freeOpen) {
+  if (typeof y !== 'number') { y = curYear; block = curBlock; after = null; freeOpen = null }
   if (document.getElementById('lkm')) return;
   const hasBlk = !!(y && block), pr = hasBlk ? blockPrice(y, block) : null, own = hasBlk && blockShop.owned.has(bkKey(y, block));
   const offer = pr !== null && !own, dp = blockShop.dayPrice;
@@ -289,7 +291,8 @@ function lockedPrompt(y, block, after) {
   if (hasBlk) {
     if (offer) h += '<div style="font-size:1.35em;font-weight:700;margin:8px 0">السعر: ' + pr + ' <i class="coin"></i></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم)</button>';
     h += '<div style="text-align:right;margin:12px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div>' +
-      '<button class="btn" id="lk1">⏳ افتح البلوك 24 ساعة بـ ' + dp + ' <i class="coin"></i></button>';
+      '<button class="btn" id="lk1">⏳ افتح البلوك 24 ساعة بـ ' + dp + ' <i class="coin"></i></button>' +
+      (freeOpen ? '<button class="btn ok" id="lkfree">🎁 أول محاضرة من كل مادة مجانًا</button>' : '');
   } else {
     h += '<p>العملي بيفتح بالاشتراك الشهري أو العرض المجاني، من صفحة الشحن.</p><button class="btn" id="lkw">💳 صفحة الشحن</button>';
   }
@@ -303,6 +306,7 @@ function lockedPrompt(y, block, after) {
   if (g('lk1')) g('lk1').onclick = () => { close(); buyBlockDay(y, block, after) };
   if (g('lkb')) g('lkb').onclick = () => { close(); buyBlock(y, block, after) };
   if (g('lkw')) g('lkw').onclick = () => { close(); walletView() };
+  if (g('lkfree')) g('lkfree').onclick = () => { close(); freeOpen() };
   if (g('lkf')) g('lkf').onclick = () => { close(); claimFree7() };
 }
 async function buyBlockDay(y, block, after) {
@@ -563,7 +567,7 @@ function blocksView(y) {
     document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     const open = () => { if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b) };
-    if (!me.is_admin && blockPrice(y, b) !== null && !canBlock(y, b)) return lockedPrompt(y, b, open);
+    if (!me.is_admin && blockPrice(y, b) !== null && !canBlock(y, b)) return lockedPrompt(y, b, open, FREE_FIRST_YEARS.includes(y) ? open : null);
     open();
   });
 }
@@ -970,6 +974,26 @@ const backFromLec = () => subs.filter(x => x.year === curYear && x.block === cur
 // 4) lectures of a subject (a lecture = the "chapter" column)
 let pracMode = false;
 const isPrac = c => /^\s*practical\b/i.test(c || '');
+async function loadLecMeta(sub) {
+  if (metaFor === sub.id) return true;
+  loading();
+  const [m, a, b, fo, fi] = await Promise.all([
+    fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
+    fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
+    sb.from('bookmarks').select('question_id'),
+    fetchFolders(c => sb.from('saved_folders').select(c).eq('subject_id', sub.id).order('id')),
+    fetchAll(() => sb.from('saved_folder_items').select('folder_id,question_id').order('folder_id').order('question_id'))
+  ]);
+  if (m.error) { alert(accMsg(m.error)); return false }
+  meta = m.data; answered = {};
+  (a.data || []).forEach(x => answered[x.question_id] = x);
+  saved = new Set((b.data || []).map(x => x.question_id));
+  foldersOk = !fo.error && !fi.error; folders = foldersOk ? fo.data : []; fitems = {};
+  folders.forEach(f => { fitems[f.id] = new Set() });
+  if (foldersOk) fi.data.forEach(x => { if (fitems[x.folder_id]) fitems[x.folder_id].add(x.question_id) });
+  metaFor = sub.id;
+  return true;
+}
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
   if (!(pracMode ? unlocked() : canBlock(sub.year, sub.block))) {
@@ -979,29 +1003,13 @@ async function lecturesView(sub) {
     let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
-    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
+    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += (!pracMode && isFreeLec(sub, x.chapter)) ? '<button class="sub lec freel" data-k="' + esc(x.chapter.trim()) + '"><b>🎁 ' + esc(lecName(x.chapter)) + '</b><br><small>مجانية · ' + x.n + ' سؤال</small></button>' : '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
     document.querySelectorAll('.lkb').forEach(b => b.onclick = () => lockedPrompt(pracMode ? 0 : sub.year, sub.block, () => lecturesView(sub)));
+    document.querySelectorAll('.freel').forEach(b => b.onclick = async () => { if (await loadLecMeta(sub)) sectionsView(b.dataset.k) });
     return;
   }
-  if (metaFor !== sub.id) {
-    loading();
-    const [m, a, b, fo, fi] = await Promise.all([
-      fetchAll(() => sb.from('questions').select('id,type,chapter,source_tag,is_key_point').eq('subject_id', sub.id).order('id')),
-      fetchAll(() => sb.from('attempts').select('question_id,chosen_index,is_correct').order('question_id')),
-      sb.from('bookmarks').select('question_id'),
-      fetchFolders(c => sb.from('saved_folders').select(c).eq('subject_id', sub.id).order('id')),
-      fetchAll(() => sb.from('saved_folder_items').select('folder_id,question_id').order('folder_id').order('question_id'))
-    ]);
-    if (m.error) { alert(accMsg(m.error)); return backFromLec() }
-    meta = m.data; answered = {};
-    (a.data || []).forEach(x => answered[x.question_id] = x);
-    saved = new Set((b.data || []).map(x => x.question_id));
-    foldersOk = !fo.error && !fi.error; folders = foldersOk ? fo.data : []; fitems = {};
-    folders.forEach(f => { fitems[f.id] = new Set() });
-    if (foldersOk) fi.data.forEach(x => { if (fitems[x.folder_id]) fitems[x.folder_id].add(x.question_id) });
-    metaFor = sub.id;
-  }
+  if (!(await loadLecMeta(sub))) return backFromLec();
   const groups = {};
   meta.forEach(q => { if (isPrac(chOf(q)) === pracMode) (groups[chOf(q)] = groups[chOf(q)] || []).push(q) });
   const card = (k, t, arr) => {
