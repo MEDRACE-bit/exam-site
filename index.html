@@ -71,7 +71,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ch.sel{border-color:#e0a526;background:#2a2108}
 .stc{display:flex;gap:10px;align-items:center;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stc input{width:18px;height:18px;margin:0;padding:0;flex:none;accent-color:#c0262d}.stc small{margin-inline-start:auto;opacity:.75;white-space:nowrap}.stc.off{opacity:.4}.stsh{margin:12px 2px 2px;font-weight:700;opacity:.85}
 .stg{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.stg button{width:34px;height:34px;padding:0;border-radius:8px;border:1px solid #3a1c1c;background:#1b0d0d;font-size:.85em}.stg .dn{background:#2a2108;border-color:#e0a526}.stg .cu{outline:2px solid #fff}
-.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}.stl{font-weight:700}.stx{width:auto;margin:0;padding:2px 10px;background:none;border:0;color:#e88;font-size:1.2em}
+.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}.stl{font-weight:700}.buyblk{margin:-2px 0 12px;padding:8px 12px;font-size:.92em}.stx{width:auto;margin:0;padding:2px 10px;background:none;border:0;color:#e88;font-size:1.2em}
 h3{margin:16px 0 4px;color:#e88}
 
 .soonmsg{text-align:center;font-weight:700;font-size:1.2rem;padding:10px;margin:8px 0;border:1px dashed #c0262d;border-radius:12px;color:#ffb3b6}
@@ -248,6 +248,19 @@ function pick(sel, cb) {
 }
 let accessUntil = 0, expiredFired = false;
 const unlocked = () => !!(me && me.is_admin) || accessUntil > Date.now();
+// شراء البلوك (دايم + اختبر نفسك)
+let blockShop = {prices: {}, owned: new Set()};
+const bkKey = (y, b) => y + '|' + b;
+async function loadBlockShop() {
+  try {
+    const {data, error} = await sb.rpc('block_shop');
+    if (error || !data) return;
+    blockShop.prices = {}; (data.prices || []).forEach(x => { blockShop.prices[bkKey(x.year, x.block)] = +x.price });
+    blockShop.owned = new Set((data.owned || []).map(x => bkKey(x.year, x.block)));
+  } catch (e) {}
+}
+const blockPrice = (y, b) => { const p = blockShop.prices[bkKey(y, b)]; return (p === undefined || isNaN(p)) ? null : p };
+const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b));
 const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
 const accessBar = () => f7Bar() + ((me && me.is_admin) ? '' : accessUntil > Date.now()
   ? (view !== 'home' && view !== 'blocks') ? '' : '<div class="tbar">⏱ الأسئلة مفتوحة، المتبقي: <b id="tm">' + fmtT(accessUntil - Date.now()) + '</b></div>'
@@ -259,16 +272,41 @@ setInterval(() => {
     expiredFired = true; alert('الاشتراك خلص، الأسئلة اتقفلت. تقدر تفتحها تاني من الزرار.'); metaFor = null; enter();
   }
 }, 1000);
-function lockedPrompt() {
+function lockedPrompt(y, block, after) {
+  if (typeof y !== 'number') { y = curYear; block = curBlock; after = null }
   if (document.getElementById('lkm')) return;
+  const pr = (y && block) ? blockPrice(y, block) : null, own = !!(y && block && blockShop.owned.has(bkKey(y, block)));
   const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
-  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b><p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>' + (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') + '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
+  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b>' +
+    (pr !== null && !own
+      ? '<p>اشتري بلوك <b>' + esc(block) + '</b> بكل أسئلته مع اختبر نفسك<br><small>من غير العملي</small></p><button class="btn" id="lkb">🛒 اشتري البلوك بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
+      : '<p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>') +
+    (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') +
+    '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
   document.body.appendChild(d);
   const close = () => d.remove();
   d.onclick = e => { if (e.target === d) close() };
   document.getElementById('lk0').onclick = close;
   document.getElementById('lk1').onclick = () => { close(); buyAccess(true) };
+  const lb = document.getElementById('lkb'); if (lb) lb.onclick = () => { close(); buyBlock(y, block, after) };
   const lf = document.getElementById('lkf'); if (lf) lf.onclick = () => { close(); claimFree7() };
+}
+async function buyBlock(y, block, after) {
+  const pr = blockPrice(y, block);
+  if (pr === null) return alert('البلوك ده مش متاح للشراء دلوقتي');
+  if (blockShop.owned.has(bkKey(y, block))) return after ? after() : blocksView(y);
+  if (!confirm('هيتخصم ' + pr + ' coin من رصيدك وتفتح بلوك ' + block + ' بكل أسئلته مع اختبر نفسك، من غير العملي. متأكد؟')) return;
+  const {data: r, error} = await sb.rpc('buy_block', {p_year: y, p_block: block});
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) {
+    if (r.reason === 'no_balance') { me.balance = r.balance; alert('رصيدك مش كفاية لشراء البلوك، اشحن الأول.'); return walletView(true) }
+    if (r.reason === 'wrong_year') return alert('البلوك ده مش بتاع فرقتك');
+    if (r.reason === 'no_price') return alert('البلوك ده مش متاح للشراء دلوقتي');
+    return blockedView(r.reason);
+  }
+  me.balance = r.balance; blockShop.owned.add(bkKey(y, block)); metaFor = null;
+  alert(r.already ? 'البلوك مفتوح عندك بالفعل' : '✔ اتفتح بلوك ' + block + ' بكل أسئلته مع اختبر نفسك');
+  after ? after() : blocksView(y);
 }
 async function buyAccess(skip) {
   if (skip !== true && !confirm('هيتخصم 2 coin من رصيدك وتفتح الأسئلة 24 ساعة. متأكد؟')) return;
@@ -373,7 +411,7 @@ async function enter() {
   const {data: r} = await sb.rpc('my_access');
   if (!r || !r.ok) return blockedView(r && r.reason);
   me.balance = r.balance; accessUntil = r.remaining > 0 ? Date.now() + r.remaining * 1000 : 0; expiredFired = false;
-  await loadFree7();
+  await loadFree7(); await loadBlockShop();
   homeView();
 }
 
@@ -390,7 +428,7 @@ function blockedView(r) {
 
 const LEC_ALL = '__all__';
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
-const PREDICTED_KEY = new Set(['3 - Resting Membrane Potential', '4 - Action Potential', '2 - The Cell Membrane', '1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation', '5 - Stretch reflexes I & II']);
+const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
 const lecName = k => k === LEC_ALL ? 'كل المحاضرات' : (k || 'عام');
 const solvedIn = a => a.filter(m => answered[m.id]).length;
@@ -474,15 +512,18 @@ function blocksView(y) {
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
-    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + '</button>';
+    const own = blockShop.owned.has(bkKey(y, b)), pr = blockPrice(y, b);
+    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : '') + '</button>';
+    const buy = (pr !== null && !own && !me.is_admin) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك + اختبر نفسك بـ ' + pr + ' <i class="coin"></i></button>' : '';
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
-    html += '<div class="lrow lr3">' + bt + stb + pb + '</div>';
+    html += '<div class="lrow lr3">' + bt + stb + pb + '</div>' + buy;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
   document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => { if (pb.dataset.pk === 'bio') { const sb1 = subs.find(x => x.year === 1 && x.block === 'Biochemistry'); if (!sb1) return alert('لسه مفيش عملي'); curBlock = 'Biochemistry'; pracMode = true; lecturesView(sb1) } else practicalView(pb.dataset.pk) });
   document.querySelectorAll('.stb').forEach(b => b.onclick = () => stHome(y, blocks[+b.dataset.n]));
+  document.querySelectorAll('.buyblk').forEach(b => b.onclick = () => buyBlock(y, blocks[+b.dataset.n], () => blocksView(y)));
   document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
@@ -503,7 +544,7 @@ let stTimer = null, stEx = null, stCfg = {}, stBm = new Set(), stBack = null;
 const stStop = () => { if (stTimer) { clearInterval(stTimer); stTimer = null } };
 
 async function stHome(y, block) {
-  if (!unlocked()) return lockedPrompt();
+  if (!canBlock(y, block)) return lockedPrompt(y, block, () => stHome(y, block));
   stStop(); stEx = null;
   view = 'selftest'; curYear = y; curBlock = block; curSub = null; curLec = null;
   loading();
@@ -893,7 +934,7 @@ let pracMode = false;
 const isPrac = c => /^\s*practical\b/i.test(c || '');
 async function lecturesView(sub) {
   view = 'lectures'; curSub = sub; curLec = null;
-  if (!unlocked()) {
+  if (!(pracMode ? unlocked() : canBlock(sub.year, sub.block))) {
     loading();
     const {data: ls, error: le} = await sb.rpc('list_lectures', {sid: sub.id});
     metaFor = null;
@@ -902,7 +943,7 @@ async function lecturesView(sub) {
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
     else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
-    document.querySelectorAll('.lkb').forEach(b => b.onclick = lockedPrompt);
+    document.querySelectorAll('.lkb').forEach(b => b.onclick = () => lockedPrompt(pracMode ? 0 : sub.year, sub.block, () => lecturesView(sub)));
     return;
   }
   if (metaFor !== sub.id) {
