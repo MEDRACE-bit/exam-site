@@ -348,12 +348,15 @@ async function buyAccess(skip) {
   me.balance = r.balance; accessUntil = Date.now() + r.remaining * 1000; expiredFired = false; metaFor = null;
   curSub && view === 'lectures' ? lecturesView(curSub) : enter();
 }
+let flags = {};
+async function loadFlags() { try { const {data} = await sb.rpc('get_flags'); flags = data || {} } catch (e) {} }
 let sub30 = {mode: 'soon', price: 40, old: null};
 async function loadSub30() {
   const {data} = await sb.rpc('get_sub30');
   sub30 = data && data.mode ? data : {mode: 'soon', price: 40, old: null};
 }
-const s30Box = () => sub30.mode === 'soon'
+const s30Box = () => flags.hide_sub30 ? '' : s30BoxRaw();
+const s30BoxRaw = () => sub30.mode === 'soon'
   ? '<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم</small><button class="btn" id="b30" disabled style="opacity:.5;cursor:not-allowed">قريبًا</button></div>'
   : (p => '<div class="sub30"><b>📅 اشتراك 30 يوم</b><br><small>افتح كل الأسئلة 30 يوم بـ ' + p + ' <i class="coin"></i></small><button class="btn" id="b30">اشترك 30 يوم بـ ' + p + ' <i class="coin"></i></button></div>')(sub30.old ? '<s>' + sub30.old + '</s> ' + sub30.price : sub30.price);
 async function buy30() {
@@ -443,7 +446,7 @@ async function enter() {
   const {data: r} = await sb.rpc('my_access');
   if (!r || !r.ok) return blockedView(r && r.reason);
   me.balance = r.balance; accessUntil = r.remaining > 0 ? Date.now() + r.remaining * 1000 : 0; expiredFired = false;
-  await loadFree7(); await loadBlockShop();
+  await loadFree7(); await loadBlockShop(); await loadFlags();
   homeView();
 }
 
@@ -1374,7 +1377,7 @@ async function adminView() {
   const rows = Array.isArray(list) ? list : [];
   const {data: pa} = await sb.rpc('admin_list_pending_accounts');
   const accs = Array.isArray(pa) ? pa : [];
-  const {data: s30a} = await sb.rpc('get_sub30'); const cur30 = (s30a && s30a.mode) || 'p40';
+  const {data: s30a} = await sb.rpc('get_sub30'); await loadFlags(); const cur30 = flags.hide_sub30 ? 'hide' : ((s30a && s30a.mode) || 'p40');
   const {data: f7s} = await sb.rpc('admin_free7_status'); const f7a = f7s && f7s.active, f7end = Date.now() + ((f7s && f7s.remaining) || 0) * 1000; const qrCur = await qrLoad();
   app.innerHTML = topBar() + '<button class="back" id="bk2">‹ رجوع</button>' + `<div class="card"><h2>طلبات إنشاء الحساب (${accs.length})</h2>
     ${accs.map(a => `<div class="card"><b>${esc(a.name)}</b> — ${yName(+a.year)}<br><span dir="ltr">${esc(a.phone)}</span><br>
@@ -1389,7 +1392,7 @@ async function adminView() {
       <button class="btn no" data-a="reject" data-id="${r.id}">✖ رفض</button></div></div>`).join('') || '<p>مفيش طلبات معلّقة</p>'}
     <button class="link" id="rf2">تحديث</button></div>
     <div class="card"><h2>📅 سعر اشتراك 30 يوم</h2>
-      <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '45'], ['p30', '30 بدل <s>45</s>']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
+      <div class="row" id="s30m">${[['soon', 'قريبًا'], ['p40', '45'], ['p30', '30 بدل <s>45</s>'], ['hide', '🙈 إخفاء']].map(([m, x]) => `<button type="button" data-v="${m}" class="${m === cur30 ? 'on' : ''}">${x}</button>`).join('')}</div><p class="msg" id="s30msg"></p></div>
     <div class="card"><h2>🎁 عرض 7 أيام مجاني</h2>
       <p>${f7a ? 'العرض شغال، ينتهي بعد: <b id="f7at">' + fmtT(f7end - Date.now()) + '</b><br>اللي استلموه: <b>' + (f7s.claims || 0) + '</b>' : 'العرض متوقف'}</p>
       <div class="row"><button class="btn ok" id="f7go" type="button">${f7a ? '🔄 ابدأ عرض جديد 24 ساعة' : '▶ ابدأ العرض 24 ساعة'}</button>${f7a ? '<button class="btn no" id="f7off" type="button">⏹ إيقاف</button>' : ''}</div><p class="msg" id="f7m"></p></div>
@@ -1402,8 +1405,16 @@ async function adminView() {
   bindTop(); qrAdminBind(qrCur);
   pick('#s30m', async v => {
     $('#s30msg').textContent = '...';
+    if (v === 'hide') {
+      const {data, error} = await sb.rpc('admin_set_flag', {p_key: 'hide_sub30', p_val: true});
+      if (!error && data && data.ok) flags.hide_sub30 = true;
+      $('#s30msg').textContent = error || !data || !data.ok ? 'حصلت مشكلة، المربع ماتخفاش' : 'المربع اتخفى عن الطلاب ✅';
+      return;
+    }
     const {data, error} = await sb.rpc('admin_set_sub30', {p_mode: v});
-    $('#s30msg').textContent = error || !data || !data.ok ? 'حصلت مشكلة، السعر ماتغيّرش' : 'تم الحفظ ✅';
+    if (error || !data || !data.ok) { $('#s30msg').textContent = 'حصلت مشكلة، السعر ماتغيّرش'; return }
+    if (flags.hide_sub30) { const r2 = await sb.rpc('admin_set_flag', {p_key: 'hide_sub30', p_val: false}); if (!r2.error && r2.data && r2.data.ok) flags.hide_sub30 = false }
+    $('#s30msg').textContent = 'تم الحفظ ✅ والمربع ظاهر للطلاب';
   });
   on('#rf2', adminView); on('#bk2', enter);
   if (f7a) { const t = setInterval(() => { const e = $('#f7at'); if (!e || view !== 'admin') return clearInterval(t); const l = f7end - Date.now(); if (l <= 0) { clearInterval(t); adminView() } else e.textContent = fmtT(l) }, 1000) }
@@ -1458,7 +1469,7 @@ async function adminView() {
 }
 
 async function walletView(forced) {
-  view = 'wallet'; let amt = 60; await loadSub30(); await loadFree7(); await loadBlockShop();
+  view = 'wallet'; let amt = 60; await loadSub30(); await loadFree7(); await loadBlockShop(); await loadFlags();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح بلوك 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card">
     ${forced ? '<p class="msg">رصيدك مش كفاية، اشحن عشان تكمل.</p>' : ''}${f7Box()}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
