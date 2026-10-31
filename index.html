@@ -281,9 +281,10 @@ function lockedPrompt(y, block, after) {
   if (document.getElementById('lkm')) return;
   const pr = (y && block) ? blockPrice(y, block) : null, own = !!(y && block && blockShop.owned.has(bkKey(y, block)));
   const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
-  d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b>' +
+  const offer = pr !== null && !own;
+  d.innerHTML = '<div class="card lkc"><b>🔒 ' + (offer ? 'بلوك ' + esc(block) : 'المحاضرة مقفولة') + '</b>' +
     (pr !== null && !own
-      ? '<p>اشتري بلوك <b>' + esc(block) + '</b> بكل أسئلته مع اختبر نفسك<br><small>من غير العملي</small></p><button class="btn" id="lkb">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
+      ? '<div style="text-align:right;margin:10px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
       : '<p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>') +
     (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') +
     '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
@@ -520,7 +521,7 @@ function blocksView(y) {
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : '') + '</button>';
     const buy = me.is_admin
       ? '<div class="adminp"><small>👑 أدمن: ' + (pr !== null ? '🛒 سعر البلوك للطلاب ' + pr + ' coin' : blockShop.err ? '⚠ خطأ في تحميل الأسعار: ' + esc(blockShop.err) : '⚠ مفيش سعر شراء متسجل للبلوك ده') + '</small></div>'
-      : (pr !== null && !own) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button>' : '';
+      : '';
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
@@ -529,10 +530,11 @@ function blocksView(y) {
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
   document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => { if (pb.dataset.pk === 'bio') { const sb1 = subs.find(x => x.year === 1 && x.block === 'Biochemistry'); if (!sb1) return alert('لسه مفيش عملي'); curBlock = 'Biochemistry'; pracMode = true; lecturesView(sb1) } else practicalView(pb.dataset.pk) });
   document.querySelectorAll('.stb').forEach(b => b.onclick = () => stHome(y, blocks[+b.dataset.n]));
-  document.querySelectorAll('.buyblk').forEach(b => b.onclick = () => buyBlock(y, blocks[+b.dataset.n], () => blocksView(y)));
-  document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
+    document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
-    if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b);
+    const open = () => { if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b) };
+    if (!me.is_admin && blockPrice(y, b) !== null && !canBlock(y, b)) return lockedPrompt(y, b, open);
+    open();
   });
 }
 
