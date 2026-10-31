@@ -71,7 +71,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ch.sel{border-color:#e0a526;background:#2a2108}
 .stc{display:flex;gap:10px;align-items:center;padding:10px 12px;margin:5px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stc input{width:18px;height:18px;margin:0;padding:0;flex:none;accent-color:#c0262d}.stc small{margin-inline-start:auto;opacity:.75;white-space:nowrap}.stc.off{opacity:.4}.stsh{margin:12px 2px 2px;font-weight:700;opacity:.85}
 .stg{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.stg button{width:34px;height:34px;padding:0;border-radius:8px;border:1px solid #3a1c1c;background:#1b0d0d;font-size:.85em}.stg .dn{background:#2a2108;border-color:#e0a526}.stg .cu{outline:2px solid #fff}
-.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}.stl{font-weight:700}.buyblk{margin:-2px 0 12px;padding:8px 12px;font-size:.92em}.stx{width:auto;margin:0;padding:2px 10px;background:none;border:0;color:#e88;font-size:1.2em}
+.stH{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;margin:6px 0;border-radius:10px;border:1px solid #3a1c1c;background:#1b0d0d}.stH .btn{width:auto;margin:0;padding:8px 14px}.stl{font-weight:700}.buyblk{margin:-2px 0 12px;padding:8px 12px;font-size:.92em}.adminp{margin:-4px 0 12px;text-align:center;opacity:.75}.stx{width:auto;margin:0;padding:2px 10px;background:none;border:0;color:#e88;font-size:1.2em}
 h3{margin:16px 0 4px;color:#e88}
 
 .soonmsg{text-align:center;font-weight:700;font-size:1.2rem;padding:10px;margin:8px 0;border:1px dashed #c0262d;border-radius:12px;color:#ffb3b6}
@@ -514,7 +514,9 @@ function blocksView(y) {
     const c = list.filter(x => x.block === b).length;
     const own = blockShop.owned.has(bkKey(y, b)), pr = blockPrice(y, b);
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : '') + '</button>';
-    const buy = (pr !== null && !own && !me.is_admin) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك + اختبر نفسك بـ ' + pr + ' <i class="coin"></i></button>' : '';
+    const buy = me.is_admin
+      ? '<div class="adminp"><small>👑 أدمن: ' + (pr !== null ? '🛒 سعر البلوك للطلاب ' + pr + ' coin' : '⚠ مفيش سعر شراء متسجل للبلوك ده') + '</small></div>'
+      : (pr !== null && !own) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك + اختبر نفسك بـ ' + pr + ' <i class="coin"></i></button>' : '';
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
