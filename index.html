@@ -283,7 +283,7 @@ function lockedPrompt(y, block, after) {
   const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
   d.innerHTML = '<div class="card lkc"><b>🔒 المحاضرة مقفولة</b>' +
     (pr !== null && !own
-      ? '<p>اشتري بلوك <b>' + esc(block) + '</b> بكل أسئلته مع اختبر نفسك<br><small>من غير العملي</small></p><button class="btn" id="lkb">🛒 اشتري البلوك بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
+      ? '<p>اشتري بلوك <b>' + esc(block) + '</b> بكل أسئلته مع اختبر نفسك<br><small>من غير العملي</small></p><button class="btn" id="lkb">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
       : '<p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>') +
     (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') +
     '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
@@ -520,7 +520,7 @@ function blocksView(y) {
     const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : '') + '</button>';
     const buy = me.is_admin
       ? '<div class="adminp"><small>👑 أدمن: ' + (pr !== null ? '🛒 سعر البلوك للطلاب ' + pr + ' coin' : blockShop.err ? '⚠ خطأ في تحميل الأسعار: ' + esc(blockShop.err) : '⚠ مفيش سعر شراء متسجل للبلوك ده') + '</small></div>'
-      : (pr !== null && !own) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك + اختبر نفسك بـ ' + pr + ' <i class="coin"></i></button>' : '';
+      : (pr !== null && !own) ? '<button class="btn buyblk" data-n="' + n + '" type="button">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button>' : '';
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
