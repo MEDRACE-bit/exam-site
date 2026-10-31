@@ -284,7 +284,7 @@ function lockedPrompt(y, block, after) {
   const offer = pr !== null && !own;
   d.innerHTML = '<div class="card lkc"><b>🔒 ' + (offer ? 'بلوك ' + esc(block) : 'المحاضرة مقفولة') + '</b>' +
     (pr !== null && !own
-      ? '<div style="text-align:right;margin:10px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم) بـ ' + pr + ' <i class="coin"></i></button><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
+      ? '<div style="font-size:1.35em;font-weight:700;margin:8px 0">السعر: ' + pr + ' <i class="coin"></i></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم)</button><div style="text-align:right;margin:12px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div><p><small>أو افتح كل الأسئلة 24 ساعة بـ 2 <i class="coin"></i></small></p>'
       : '<p>افتح الأسئلة 24 ساعة بـ 2 <i class="coin"></i></p>') +
     (f7On() && !free7.claimed ? '<button class="btn" id="lkf">🎁 فعّل 7 أيام مجاني</button>' : '') +
     '<button class="btn" id="lk1">🔓 افتح 24 ساعة بـ 2 <i class="coin"></i></button><button class="link" id="lk0">إلغاء</button></div>';
@@ -1431,7 +1431,7 @@ async function adminView() {
 }
 
 async function walletView(forced) {
-  view = 'wallet'; let amt = 60; await loadSub30(); await loadFree7();
+  view = 'wallet'; let amt = 60; await loadSub30(); await loadFree7(); await loadBlockShop();
   const {data: rq} = await sb.from('topup_requests').select('amount,status').order('created_at', {ascending: false}).limit(5);
   app.innerHTML = topBar() + BK('‹ رجوع') + `<div class="rate"><i class="coin"></i>فتح الأسئلة 24 ساعة = <b>2</b> <i class="coin"></i></div><div class="card">
     ${forced ? '<p class="msg">رصيدك مش كفاية لفتح 24 ساعة، اشحن عشان تكمل.</p>' : ''}${f7Box()}${s30Box()}<p class="pay-info">${linkTG(PAY_INFO)}</p>
@@ -1444,7 +1444,7 @@ async function walletView(forced) {
     <input id="pf" placeholder="رقم العملية أو آخر 4 أرقام من رقمك">
     <button class="btn" id="sd">ابعت طلب الشحن</button><p class="msg" id="m"></p>
     <button class="link rbox" id="rf">تحديث الرصيد</button></div>` +
-    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '');
+    (rq && rq.length ? `<div class="card"><b>آخر الطلبات</b>${rq.map(r => `<p>${r.amount} <i class="coin"></i> — ${ST[r.status] || ''}</p>`).join('')}</div>` : '') + blocksBox();
   bindTop(); pick('#am', v => { amt = +v; $('#av').value = v });
   $('#av').oninput = () => {
     amt = Math.floor(+$('#av').value) || 0;
@@ -1462,6 +1462,18 @@ async function walletView(forced) {
     $('#m').textContent = error ? 'حصلت مشكلة، حاول تاني' : 'تم إرسال الطلب، هيتراجع ويتضاف الرصيد';
   });
   on('#b30', buy30); on('#rf', enter); on('#bk', enter);
+  document.querySelectorAll('.bkb').forEach(b => b.onclick = () => buyBlock(+b.dataset.y, b.dataset.b, () => walletView()));
+}
+// مربع اشتراك البلوكات في صفحة الشحن
+function blocksBox() {
+  const items = Object.keys(blockShop.prices).map(k => { const i = k.indexOf('|'); return {y: +k.slice(0, i), b: k.slice(i + 1), pr: blockShop.prices[k]} });
+  if (!items.length) return '';
+  items.sort((a, b) => a.y - b.y || ((BLOCK_ORDER[a.y] || []).indexOf(a.b) + 1 || 999) - ((BLOCK_ORDER[b.y] || []).indexOf(b.b) + 1 || 999) || a.b.localeCompare(b.b));
+  return '<div class="card" id="blkbox"><b>🧩 اشتراك البلوكات</b><p><small>الاشتراك دائم، ويفتح البلوك + اختبر نفسك.</small></p>' + items.map(x => {
+    const own = blockShop.owned.has(bkKey(x.y, x.b));
+    return '<div class="stH"><div><b>' + esc(x.b) + '</b><br><small>- البلوك<br>- اختبر نفسك</small></div><span>' +
+      (own ? '✅ مفتوح' : me.is_admin ? '<b>' + x.pr + '</b> <i class="coin"></i>' : '<button type="button" class="btn bkb" data-y="' + x.y + '" data-b="' + esc(x.b) + '">🛒 اشتري (دائم) بـ ' + x.pr + ' <i class="coin"></i></button>') + '</span></div>';
+  }).join('') + '</div>';
 }
 
 document.onkeydown = e => {
