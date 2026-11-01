@@ -267,7 +267,9 @@ async function loadBlockShop() {
 }
 const blockPrice = (y, b) => { const p = blockShop.prices[bkKey(y, b)]; return (p === undefined || isNaN(p)) ? null : p };
 const FREE_FIRST_YEARS = [3];   // الفرق اللي أول محاضرة من كل مادة فيها مجانية
-const isFreeLec = (sub, ch) => FREE_FIRST_YEARS.includes(sub.year) && /^\s*1\s*[-–]/.test(ch || '');
+// محاضرات مجانية إضافية (بالاسم): الفرقة + البلوك + المادة + اسم المحاضرة
+const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}];
+const isFreeLec = (sub, ch) => (FREE_FIRST_YEARS.includes(sub.year) && /^\s*1\s*[-–]/.test(ch || '')) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
 const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b)) || passOn(y, b);
 const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
