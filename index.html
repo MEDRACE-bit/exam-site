@@ -249,7 +249,7 @@ function pick(sel, cb) {
 let accessUntil = 0, expiredFired = false;
 const unlocked = () => !!(me && me.is_admin) || accessUntil > Date.now();
 // شراء البلوك (دايم + اختبر نفسك)
-let blockShop = {prices: {}, owned: new Set(), passes: {}, dayPrice: 2};
+let blockShop = {prices: {}, old: {}, owned: new Set(), passes: {}, bundles: [], dayPrice: 2};
 const bkKey = (y, b) => y + '|' + b;
 async function loadBlockShop() {
   blockShop.err = '';
@@ -257,7 +257,8 @@ async function loadBlockShop() {
     try {
       const {data, error} = await sb.rpc(fn);
       if (error || !data) { blockShop.err = blockShop.err || (fn + ': ' + ((error && error.message) || 'لا توجد بيانات')); continue }
-      blockShop.prices = {}; (data.prices || []).forEach(x => { blockShop.prices[bkKey(x.year, x.block)] = +x.price });
+      blockShop.prices = {}; blockShop.old = {}; (data.prices || []).forEach(x => { blockShop.prices[bkKey(x.year, x.block)] = +x.price; if (x.old_price) blockShop.old[bkKey(x.year, x.block)] = +x.old_price });
+      blockShop.bundles = data.bundles || [];
       blockShop.owned = new Set((data.owned || []).map(x => bkKey(x.year, x.block)));
       blockShop.passes = {}; (data.passes || []).forEach(x => { blockShop.passes[bkKey(x.year, x.block)] = Date.now() + (+x.remaining) * 1000 });
       if (data.day_price) blockShop.dayPrice = +data.day_price;
@@ -266,12 +267,20 @@ async function loadBlockShop() {
   }
 }
 const blockPrice = (y, b) => { const p = blockShop.prices[bkKey(y, b)]; return (p === undefined || isNaN(p)) ? null : p };
-const FREE_FIRST_YEARS = [3];   // الفرق اللي أول محاضرة من كل مادة فيها مجانية
+const FREE_FIRST = {1: 2, 3: 1};   // الفرقة: عدد أول محاضرات مجانية في كل مادة (الفرقة 1: أول محاضرتين، الفرقة 3: أول محاضرة)
+const FREE_FIRST_YEARS = Object.keys(FREE_FIRST).map(Number);
+const firstFree = (sub, ch) => { const n = FREE_FIRST[sub.year], m = /^\s*(\d+)\s*[-–]/.exec(ch || ''); return !!(n && m && +m[1] >= 1 && +m[1] <= n) };
 // محاضرات مجانية إضافية (بالاسم): الفرقة + البلوك + المادة + اسم المحاضرة
 const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}];
-const isFreeLec = (sub, ch) => (FREE_FIRST_YEARS.includes(sub.year) && /^\s*1\s*[-–]/.test(ch || '')) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
+const isFreeLec = (sub, ch) => firstFree(sub, ch) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
-const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b)) || passOn(y, b);
+const FREE_BLOCKS = [{year: 1, block: /^ethic/i}];   // بلوكات مجانية بالكامل
+const freeBlock = (y, b) => FREE_BLOCKS.some(x => x.year === y && x.block.test(String(b || '').trim()));
+const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b)) || passOn(y, b) || freeBlock(y, b);
+const blockOld = (y, b) => blockShop.old[bkKey(y, b)] || null;
+const priceTxt = (old, pr) => (old ? '<s>' + old + '</s> ' : '') + pr;
+const bundleInfo = y => (blockShop.bundles || []).find(g => g.year === y) || null;
+const bundleOwned = g => g.blocks.every(b => blockShop.owned.has(bkKey(g.year, b)));
 const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (d ? d + ' يوم ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':') };
 const accessBar = () => f7Bar() + ((me && me.is_admin) ? '' : accessUntil > Date.now()
   ? (view !== 'home' && view !== 'blocks') ? '' : '<div class="tbar">⏱ الأسئلة مفتوحة، المتبقي: <b id="tm">' + fmtT(accessUntil - Date.now()) + '</b></div>'
@@ -291,7 +300,11 @@ function lockedPrompt(y, block, after, freeOpen) {
   const d = document.createElement('div'); d.id = 'lkm'; d.className = 'lkm';
   let h = '<div class="card lkc"><b>🔒 ' + (hasBlk ? 'بلوك ' + esc(block) : 'العملي مقفول') + '</b>';
   if (hasBlk) {
-    if (offer) h += '<div style="font-size:1.35em;font-weight:700;margin:8px 0">السعر: ' + pr + ' <i class="coin"></i></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم)</button>';
+    if (offer) {
+      h += '<div style="font-size:1.35em;font-weight:700;margin:8px 0">السعر: ' + priceTxt(blockOld(y, block), pr) + ' <i class="coin"></i></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم)</button>';
+      const bd = bundleInfo(y);
+      if (bd && !bundleOwned(bd)) h += '<button class="btn ok" id="lkbd">🎁 كل البلوكات المدفوعة ' + priceTxt(bd.old_price, bd.price) + ' <i class="coin"></i></button>';
+    }
     h += '<div style="text-align:right;margin:12px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div>' +
       '<button class="btn" id="lk1">⏳ افتح البلوك 24 ساعة بـ ' + dp + ' <i class="coin"></i></button>' +
       (freeOpen ? '<button class="btn ok" id="lkfree">🎁 أول محاضرة من كل مادة مجانًا</button>' : '');
@@ -307,9 +320,29 @@ function lockedPrompt(y, block, after, freeOpen) {
   const g = id => document.getElementById(id);
   if (g('lk1')) g('lk1').onclick = () => { close(); buyBlockDay(y, block, after) };
   if (g('lkb')) g('lkb').onclick = () => { close(); buyBlock(y, block, after) };
+  if (g('lkbd')) g('lkbd').onclick = () => { close(); buyBundle(y, after) };
   if (g('lkw')) g('lkw').onclick = () => { close(); walletView() };
   if (g('lkfree')) g('lkfree').onclick = () => { close(); freeOpen() };
   if (g('lkf')) g('lkf').onclick = () => { close(); claimFree7() };
+}
+async function buyBundle(y, after) {
+  const g = bundleInfo(y);
+  if (!g) return alert('الباقة مش متاحة دلوقتي');
+  if (bundleOwned(g)) return after ? after() : blocksView(y);
+  const credit = g.blocks.reduce((t, b) => t + (blockShop.owned.has(bkKey(y, b)) ? (blockPrice(y, b) || 0) : 0), 0);
+  const pay = Math.max(0, g.price - credit);
+  if (!confirm('هيتخصم ' + pay + ' coin وتفتح كل البلوكات المدفوعة (' + g.blocks.join('، ') + ') دائم، مع اختبر نفسك. متأكد؟')) return;
+  const {data: r, error} = await sb.rpc('buy_bundle', {p_year: y});
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) {
+    if (r.reason === 'no_balance') { me.balance = r.balance; alert('رصيدك مش كفاية لشراء الباقة، اشحن الأول.'); return walletView(true) }
+    if (r.reason === 'wrong_year') return alert('الباقة دي مش بتاعة فرقتك');
+    if (r.reason === 'no_price') return alert('الباقة مش متاحة دلوقتي');
+    return blockedView(r.reason);
+  }
+  me.balance = r.balance; g.blocks.forEach(b => blockShop.owned.add(bkKey(y, b))); metaFor = null;
+  alert(r.already ? 'كل البلوكات مفتوحة عندك بالفعل' : '✔ اتفتحت كل البلوكات المدفوعة');
+  after ? after() : blocksView(y);
 }
 async function buyBlockDay(y, block, after) {
   const dp = blockShop.dayPrice;
@@ -556,7 +589,7 @@ function blocksView(y) {
   blocks.forEach((b, n) => {
     const c = list.filter(x => x.block === b).length;
     const own = blockShop.owned.has(bkKey(y, b)), pr = blockPrice(y, b);
-    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : passOn(y, b) ? '<br><small>⏳ مفتوح 24 ساعة</small>' : '') + '</button>';
+    const bt = '<button class="sub blk" data-n="' + n + '">' + icon(b) + '<b>' + esc(b) + '</b>' + (c > 1 ? '<br><small>' + c + ' مادة</small>' : '') + (own ? '<br><small>✅ مفتوح</small>' : freeBlock(y, b) ? '<br><small>🎁 مجاني</small>' : passOn(y, b) ? '<br><small>⏳ مفتوح 24 ساعة</small>' : '') + '</button>';
     const buy = me.is_admin
       ? '<div class="adminp"><small>👑 أدمن: ' + (pr !== null ? '🛒 سعر البلوك للطلاب ' + pr + ' coin' : blockShop.err ? '⚠ خطأ في تحميل الأسعار: ' + esc(blockShop.err) : '⚠ مفيش سعر شراء متسجل للبلوك ده') + '</small></div>'
       : '';
@@ -1528,16 +1561,17 @@ async function walletView(forced) {
   });
   on('#b30', buy30); on('#rf', enter); on('#bk', enter);
   document.querySelectorAll('.bkb').forEach(b => b.onclick = () => buyBlock(+b.dataset.y, b.dataset.b, () => walletView()));
+  document.querySelectorAll('.bdb').forEach(b => b.onclick = () => buyBundle(+b.dataset.y, () => walletView()));
 }
 // مربع اشتراك البلوكات في صفحة الشحن
 function blocksBox() {
-  const items = Object.keys(blockShop.prices).map(k => { const i = k.indexOf('|'); return {y: +k.slice(0, i), b: k.slice(i + 1), pr: blockShop.prices[k]} });
-  if (!items.length) return '';
+  const items = Object.keys(blockShop.prices).map(k => { const i = k.indexOf('|'); return {y: +k.slice(0, i), b: k.slice(i + 1), pr: blockShop.prices[k], old: blockShop.old[k]} });
+  if (!items.length && !(blockShop.bundles || []).length) return '';
   items.sort((a, b) => a.y - b.y || ((BLOCK_ORDER[a.y] || []).indexOf(a.b) + 1 || 999) - ((BLOCK_ORDER[b.y] || []).indexOf(b.b) + 1 || 999) || a.b.localeCompare(b.b));
-  return '<div class="card" id="blkbox"><b>🧩 اشتراك البلوكات</b><p><small>الاشتراك دائم، ويفتح البلوك + اختبر نفسك.</small></p>' + items.map(x => {
+  return '<div class="card" id="blkbox"><b>🧩 اشتراك البلوكات</b><p><small>الاشتراك دائم، ويفتح البلوك + اختبر نفسك.</small></p>' + (blockShop.bundles || []).map(g => '<div class="stH"><div><b>🎁 كل البلوكات المدفوعة</b><br><small>' + g.blocks.map(esc).join(' - ') + '</small></div><span>' + (bundleOwned(g) ? '✅ مفتوحة' : me.is_admin ? priceTxt(g.old_price, '<b>' + g.price + '</b>') + ' <i class="coin"></i>' : '<button type="button" class="btn bdb" data-y="' + g.year + '">🛒 اشتري الكل (دائم) ' + priceTxt(g.old_price, g.price) + ' <i class="coin"></i></button>') + '</span></div>').join('') + items.map(x => {
     const own = blockShop.owned.has(bkKey(x.y, x.b));
     return '<div class="stH"><div><b>' + esc(x.b) + '</b><br><small>- البلوك<br>- اختبر نفسك</small></div><span>' +
-      (own ? '✅ مفتوح' : me.is_admin ? '<b>' + x.pr + '</b> <i class="coin"></i>' : '<button type="button" class="btn bkb" data-y="' + x.y + '" data-b="' + esc(x.b) + '">🛒 اشتري (دائم) بـ ' + x.pr + ' <i class="coin"></i></button>') + '</span></div>';
+      (own ? '✅ مفتوح' : me.is_admin ? priceTxt(x.old, '<b>' + x.pr + '</b>') + ' <i class="coin"></i>' : '<button type="button" class="btn bkb" data-y="' + x.y + '" data-b="' + esc(x.b) + '">🛒 اشتري (دائم) بـ ' + priceTxt(x.old, x.pr) + ' <i class="coin"></i></button>') + '</span></div>';
   }).join('') + '</div>';
 }
 
