@@ -305,7 +305,7 @@ function lockedPrompt(y, block, after, freeOpen) {
       '<div style="text-align:right;margin:12px 0"><b>المحتويات:</b><div>- البلوك</div><div>- اختبر نفسك</div></div>';
     if (offer) h += '<div style="font-size:1.35em;font-weight:700;margin:8px 0">السعر: ' + priceTxt(blockOld(y, block), pr) + ' <i class="coin"></i></div><button class="btn" id="lkb">🛒 اشتري البلوك (دائم)</button>';
     h += '<button class="btn" id="lk1">⏳ افتح البلوك يوم بـ ' + dp + ' <i class="coin"></i></button>' +
-      (freeOpen ? '<button class="btn ok" id="lkfree">🎁 أول محاضرة من كل مادة مجانًا</button>' : '');
+      (freeOpen ? '<button class="btn ok" id="lkfree">🎁 ' + (FREE_FIRST[y] === 2 ? 'أول محاضرتين' : 'أول محاضرة') + ' من كل مادة ' + (y === 1 ? 'هدية' : 'مجانًا') + '</button>' : '');
   } else {
     h += '<b>🔒 العملي مقفول</b><p>العملي بيفتح بالاشتراك الشهري أو العرض المجاني، من صفحة الشحن.</p><button class="btn" id="lkw">💳 صفحة الشحن</button>';
   }
@@ -1001,7 +1001,7 @@ async function lecturesView(sub) {
     let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
-    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += (!pracMode && isFreeLec(sub, x.chapter)) ? '<button class="sub lec freel" data-k="' + esc(x.chapter.trim()) + '"><b>🎁 ' + esc(lecName(x.chapter)) + '</b><br><small>مجانية · ' + x.n + ' سؤال</small></button>' : '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
+    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += (!pracMode && isFreeLec(sub, x.chapter)) ? '<button class="sub lec freel" data-k="' + esc(x.chapter.trim()) + '"><b>🎁 ' + esc(lecName(x.chapter)) + '</b><br><small>' + (sub.year === 1 ? 'هدية' : 'مجانية') + ' · ' + x.n + ' سؤال</small></button>' : '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
     document.querySelectorAll('.lkb').forEach(b => b.onclick = () => lockedPrompt(pracMode ? 0 : sub.year, sub.block, () => lecturesView(sub)));
     document.querySelectorAll('.freel').forEach(b => b.onclick = async () => { if (await loadLecMeta(sub)) sectionsView(b.dataset.k) });
