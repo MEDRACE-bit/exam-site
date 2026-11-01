@@ -65,7 +65,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 #pz-panel{display:flex;gap:8px;justify-content:center}#pz-prev{padding:13px 16px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-prev:disabled{opacity:.35}#pz-sv{padding:13px 12px;border-radius:12px;border:1px solid #c0262d;background:#241212;color:#fff;font:inherit;font-weight:700}#pz-btn{display:block;flex:1;max-width:620px;margin:0;padding:13px;border-radius:12px;border:0;background:#c0262d;color:#fff;font:inherit;font-size:17px;font-weight:700}
 
 .sub.prac{background:#0c2a33;border-color:#1aa3c4;color:#e6fbff;text-align:center}.sub.prac small{color:#8fd8e8}.sub.prac.soon{opacity:.4;filter:grayscale(1);cursor:not-allowed}
-.lr3.lr2 .stb{flex:2}.lr3.lr2 .sub.stb{font-size:1em;padding:14px 8px}.lr3 .blk{flex:2;min-width:0}.lr3 .stb,.lr3 .prac,.lr3 .lsp{flex:1;min-width:0}.lr3 .sub.stb,.lr3 .sub.prac{padding:12px 3px;text-align:center;font-size:.82em;display:flex;flex-direction:column;justify-content:center;word-break:break-word}.lsp{margin:8px 0}
+.lr3.lr40 .stb{flex:2}.lr3.lr40 .blk{flex:3}.lr3.lr2 .stb{flex:2}.lr3.lr2 .sub.stb{font-size:1em;padding:14px 8px}.lr3 .blk{flex:2;min-width:0}.lr3 .stb,.lr3 .prac,.lr3 .lsp{flex:1;min-width:0}.lr3 .sub.stb,.lr3 .sub.prac{padding:12px 3px;text-align:center;font-size:.82em;display:flex;flex-direction:column;justify-content:center;word-break:break-word}.lsp{margin:8px 0}
 .lr3 .sub.prac b{font-size:.74em;letter-spacing:-.2px}.lr3 .sub.prac small{font-size:.7em}
 .sub.stb{background:#2a2108;border-color:#e0a526;color:#fff2cf}.sub.stb small{color:#f0cf7a}
 .ch.sel{border-color:#e0a526;background:#2a2108}
@@ -563,8 +563,8 @@ function blocksView(y) {
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
-    const noPrac = /^psycholog/i.test(String(b).trim());
-    html += '<div class="lrow lr3' + (noPrac ? ' lr2' : '') + '">' + bt + stb + (noPrac ? '' : pb) + '</div>' + buy;
+    const isEth = /^ethic/i.test(String(b).trim()), noPrac = isEth || /^psycholog/i.test(String(b).trim());
+    html += '<div class="lrow lr3' + (isEth ? ' lr2 lr40' : noPrac ? ' lr2' : '') + '">' + bt + stb + (noPrac ? '' : pb) + '</div>' + buy;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
   document.querySelectorAll('.prac').forEach(pb => pb.onclick = () => { if (pb.dataset.pk === 'bio') { const sb1 = subs.find(x => x.year === 1 && x.block === 'Biochemistry'); if (!sb1) return alert('لسه مفيش عملي'); curBlock = 'Biochemistry'; pracMode = true; lecturesView(sb1) } else practicalView(pb.dataset.pk) });
