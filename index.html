@@ -563,7 +563,7 @@ function blocksView(y) {
     const pk = y === 1 ? (b === 'Anatomy' ? 'anat' : b === 'Terminology' ? null : 'soon') : 'soon';
     const stb = '<button class="sub stb" data-n="' + n + '"><b>اختبر نفسك</b><br><small>📝 اختبار</small></button>';
     const pb = pk === 'soon' ? '<button class="sub prac soon" disabled><b>PRACTICAL</b><br><small>قريباً</small></button>' : pk ? '<button class="sub prac" data-pk="' + pk + '"><b>PRACTICAL</b><br><small>' + (pk === 'bio' ? 'عملي البايوكيمستري' : PZ[pk].name) + '</small></button>' : '<span class="lsp"></span>';
-    const noPrac = true; // الـ PRACTICAL مخفي: اختبر نفسك ياخد نص الصف
+    const noPrac = /^psycholog/i.test(String(b).trim());
     html += '<div class="lrow lr3' + (noPrac ? ' lr2' : '') + '">' + bt + stb + (noPrac ? '' : pb) + '</div>' + buy;
   });
   app.innerHTML = html; bindTop(); on('#bk', () => homeView());
