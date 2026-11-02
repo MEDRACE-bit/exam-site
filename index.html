@@ -1065,7 +1065,7 @@ function typeKeyView(sc, k) {
   if (sc.a.some(q => INNER_TAGS.includes(q.source_tag))) {
     const o3 = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a},
       {t: 'MCQ', f: Object.assign({}, sc.f, {nosrc: 1, nokey: 1}), a: sc.a.filter(q => !q.is_key_point && !q.source_tag)},
-      {t: '⭐ المهم', f: Object.assign({}, sc.f, {key: 1, nosrc: 1}), a: keyA.filter(q => !q.source_tag)}];
+      {t: '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({}, sc.f, {key: 1, nosrc: 1}), a: keyA.filter(q => !q.source_tag)}];
     INNER_TAGS.forEach(tg => o3.push({t: tg, f: Object.assign({}, sc.f, {src: tg}), a: sc.a.filter(q => q.source_tag === tg)}));
     const o4 = o3.filter(x => x.a.length);
     app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
