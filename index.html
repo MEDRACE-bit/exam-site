@@ -1070,7 +1070,7 @@ function typeKeyView(sc, k) {
     const o4 = o3.filter(x => x.a.length);
     const bt = (x, n, cls) => '<button class="sub kty' + (cls || '') + '" data-n="' + n + '"><b>' + esc(x.t) + '</b><br><small>' + solvedIn(x.a) + ' / ' + x.a.length + ' سؤال</small>' + bar(solvedIn(x.a), x.a.length) + '</button>';
     app.innerHTML = topBar() + BK('‹ رجوع') + crumb() + '<h2>' + esc(sc.t) + '</h2>' +
-      '<div style="position:relative">' + bt(o4[0], 0) + '<span id="allarw" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.9em;font-weight:900;cursor:pointer;line-height:1;border-radius:50%;background:var(--accent,#2563eb);color:#fff;box-shadow:0 2px 6px #0004">▾</span></div>' +
+      '<div style="position:relative">' + bt(o4[0], 0) + '<span id="allarw" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:1.9em;font-weight:900;cursor:pointer;line-height:1;border-radius:50%;background:#c0262d;color:#fff;box-shadow:0 2px 6px #0004">▾</span></div>' +
       '<div id="allsub" style="display:none">' + o4.slice(1).map((x, n) => bt(x, n + 1)).join('') + '</div>';
     bindTop(); on('#bk', () => sectionsView(k));
     document.querySelectorAll('.kty').forEach(b => b.onclick = () => startQuiz(o4[+b.dataset.n].f));
