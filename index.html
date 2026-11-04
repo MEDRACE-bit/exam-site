@@ -274,8 +274,11 @@ const firstFree = (sub, ch) => { const n = FREE_FIRST[sub.year], m = /^\s*(\d+)\
 const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}];
 const isFreeLec = (sub, ch) => firstFree(sub, ch) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
-const FREE_BLOCKS = [{year: 1, block: /^ethic/i}];   // بلوكات مجانية بالكامل
-const freeBlock = (y, b) => FREE_BLOCKS.some(x => x.year === y && x.block.test(String(b || '').trim()));
+const FREE_BLOCKS = [
+  {year: 1, block: /^ethic/i},   // بلوكات مجانية بالكامل
+  {year: 1, block: /^(physiology|histology)$/i, until: '2026-11-11T10:00:00+02:00'}   // مجاني أسبوع (لحد 11 نوفمبر 10 ص)
+];
+const freeBlock = (y, b) => FREE_BLOCKS.some(x => x.year === y && x.block.test(String(b || '').trim()) && (!x.until || Date.now() < Date.parse(x.until)));
 const canBlock = (y, b) => unlocked() || blockShop.owned.has(bkKey(y, b)) || passOn(y, b) || freeBlock(y, b);
 const blockOld = (y, b) => blockShop.old[bkKey(y, b)] || null;
 const priceTxt = (old, pr) => (old ? '<s>' + old + '</s> ' : '') + pr;
