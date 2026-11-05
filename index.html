@@ -325,6 +325,24 @@ function lockedPrompt(y, block, after, freeOpen) {
   if (g('lkfree')) g('lkfree').onclick = () => { close(); freeOpen() };
   if (g('lkf')) g('lkf').onclick = () => { close(); claimFree7() };
 }
+async function buyBlockDay(y, block, after) {
+  const dp = blockShop.dayPrice;
+  if (passOn(y, block) || blockShop.owned.has(bkKey(y, block))) return after ? after() : blocksView(y);
+  if (!confirm('هيتخصم ' + dp + ' coin من رصيدك وتفتح بلوك ' + block + ' 24 ساعة (البلوك + اختبر نفسك). متأكد؟')) return;
+  const {data: r, error} = await sb.rpc('buy_block_day', {p_year: y, p_block: block});
+  if (error || !r) return alert('حصلت مشكلة، حاول تاني');
+  if (!r.ok) {
+    if (r.reason === 'no_balance') { me.balance = r.balance; alert('رصيدك مش كفاية، اشحن الأول.'); return walletView(true) }
+    if (r.reason === 'wrong_year') return alert('البلوك ده مش بتاع فرقتك');
+    if (r.reason === 'no_block') return alert('البلوك ده مش موجود');
+    return blockedView(r.reason);
+  }
+  me.balance = r.balance;
+  if (r.permanent) blockShop.owned.add(bkKey(y, block)); else blockShop.passes[bkKey(y, block)] = Date.now() + (+r.remaining) * 1000;
+  metaFor = null;
+  alert(r.already ? 'البلوك مفتوح عندك بالفعل' : '✔ اتفتح بلوك ' + block + ' 24 ساعة');
+  after ? after() : blocksView(y);
+}
 async function buyBlock(y, block, after) {
   const pr = blockPrice(y, block);
   if (pr === null) return alert('البلوك ده مش متاح للشراء دلوقتي');
