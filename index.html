@@ -117,6 +117,9 @@ const toEn = s => String(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.inde
 const ST = {pending:'قيد المراجعة', approved:'تمت الموافقة', rejected:'مرفوض'};
 let sb, me, view, qs = [], i = 0, saved = new Set(), answered = {}, fromSaved = false, savedLec = null, shuffled = false;
 let folders = [], fitems = {}, foldersOk = false, fromFolder = null;
+const inFolder = id => folders.some(f => fitems[f.id] && fitems[f.id].has(id));
+const folderNames = id => folders.filter(f => fitems[f.id] && fitems[f.id].has(id)).map(f => f.name);
+function paintFnm(q) { const el = document.getElementById('fnm'); if (!el) return; const n = folderNames(q.id); el.innerHTML = n.length ? '📁 ' + n.map(esc).join(' ، ') : ''; el.style.display = n.length ? '' : 'none' }
 let subs = [], meta = [], metaFor = null, curYear = 0, curBlock = null, curSub = null, curLec = null;
 
 function accMsg(e) {
@@ -1056,8 +1059,8 @@ function sectionsView(k) {
   view = 'sections'; curLec = k;
   const arr = k === LEC_ALL ? meta : meta.filter(q => chOf(q) === k);
   const secs = [];
-  const mySaved = arr.filter(q => saved.has(q.id));
-  if (mySaved.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
+  const mySavedAll = arr.filter(q => saved.has(q.id)), mySaved = mySavedAll.filter(q => !inFolder(q.id));
+  if (mySavedAll.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
   Array.from(new Set(arr.map(q => q.source_tag).filter(t => t && t !== FOCUS_TAG && !INNER_TAGS.includes(t) && !AUTHOR_TAGS.includes(t)))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t), nm = t === 'mcq' ? 'MCQ' : 'Written';
@@ -1136,7 +1139,7 @@ function fmtModel(t) {
 function savedTypes(k) {
   if (k === undefined) k = savedLec;
   view = 'savedtypes'; savedLec = k; fromSaved = false;
-  const mine = meta.filter(q => saved.has(q.id) && (k === LEC_ALL || chOf(q) === k));
+  const mine = meta.filter(q => saved.has(q.id) && !inFolder(q.id) && (k === LEC_ALL || chOf(q) === k));
   const secs = [['mcq', 'MCQ'], ['written', 'Written']].map(([t, n]) => ({t, n, a: mine.filter(q => q.type === t)})).filter(x => x.a.length);
   curLec = k;
   const fl = foldersOk ? folders.filter(f => k === LEC_ALL || !f.chapter || f.chapter === k) : [];
@@ -1217,7 +1220,7 @@ function folderPicker(q) {
   ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.78);overflow:auto;padding:14px';
   const inAny = () => folders.some(f => fitems[f.id].has(q.id));
   const sync = () => { const d = ov.querySelector('#fpc'); if (d) d.disabled = !inAny() };
-  const close = () => { ov.remove(); const st = $('#st'); if (st) st.textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ' };
+  const close = () => { ov.remove(); const st = $('#st'); if (st) st.textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'; paintFnm(q) };
   const cand = () => folders.filter(f => !f.chapter || f.chapter === chOf(q));
   const render = () => {
     ov.innerHTML = '<div class="card" style="max-width:520px;margin:16px auto"><h2>📁 أضف السؤال لقسم</h2>' +
@@ -1274,10 +1277,10 @@ function quizView() {
   }
   const a = answered[q.id];
   app.innerHTML = topBar() + `<div class="bar"><button class="back" id="bk">‹ رجوع</button><span>${i + 1} / ${qs.length}</span><span><button class="svb" id="st">${saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'}</button>${foldersOk && !(stBack && stBack.qs === qs) ? ' <button class="svb" id="fl" type="button">📁</button>' : ''}</span></div>
-    <div class="card"><small>${shuffled ? '🔀 ترتيب عشوائي · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag && q.source_tag !== FOCUS_TAG ? '· ' + esc(q.source_tag) : ''}</small>
+    <div class="card"><div id="fnm" class="fnm" style="display:none;color:#c0262d;font-weight:700;margin-bottom:6px"></div><small>${shuffled ? '🔀 ترتيب عشوائي · ' : ''}${q.is_key_point ? '⭐ ' : ''}${esc(q.chapter || '')} ${q.source_tag && q.source_tag !== FOCUS_TAG ? '· ' + esc(q.source_tag) : ''}</small>
     <p class="q" dir="auto">${esc(q.body)}</p><div id="ans"></div></div>
     <div class="row"><button id="pv">السابق</button><button id="nx">التالي</button></div><div class="rrow"><button class="link rbox" id="rs">🔄 حل من الأول</button><button class="link rbox" id="sh">🔀 لخبط الأسئلة</button></div>`;
-  bindTop(); on('#bk', () => stBack && stBack.qs === qs ? stBack.f() : fromSaved ? (fromFolder ? folderView(fromFolder) : savedTypes()) : sectionsView()); on('#fl', () => folderPicker(q)); on('#pv', () => go(-1)); on('#nx', () => go(1));
+  paintFnm(q); bindTop(); on('#bk', () => stBack && stBack.qs === qs ? stBack.f() : fromSaved ? (fromFolder ? folderView(fromFolder) : savedTypes()) : sectionsView()); on('#fl', () => folderPicker(q)); on('#pv', () => go(-1)); on('#nx', () => go(1));
   on('#rs', async () => {
     if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
     const btn = $('#rs'); if (btn) btn.disabled = true;
@@ -1294,7 +1297,7 @@ function quizView() {
   on('#st', async () => {
     if (saved.has(q.id)) { await sb.from('bookmarks').delete().eq('question_id', q.id); saved.delete(q.id); Object.keys(fitems).forEach(k => fitems[k].delete(q.id)) }
     else { await sb.from('bookmarks').insert({user_id: me.id, question_id: q.id}); saved.add(q.id) }
-    $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ';
+    $('#st').textContent = saved.has(q.id) ? '★ محفوظ' : '☆ حفظ'; paintFnm(q);
   });
   const box = $('#ans');
   if (q.type === 'mcq') {
