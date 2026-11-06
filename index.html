@@ -1285,8 +1285,8 @@ function quizView() {
     if (!confirm('هتمسح تقدمك في الأسئلة دي وتبدأ من الأول. الأسئلة المحفوظة هتفضل زي ما هي. متأكد؟')) return;
     const btn = $('#rs'); if (btn) btn.disabled = true;
     const ids = qs.map(x => x.id);
-    const {error} = await sb.rpc('reset_progress', {qids: ids});
-    if (error) { if (btn) btn.disabled = false; return alert('حصلت مشكلة، حاول تاني') }
+    const {data: rd, error} = await sb.rpc('reset_progress', {qids: ids});
+    if (error || (rd && rd.ok === false)) { if (btn) btn.disabled = false; return alert('حصلت مشكلة: ' + ((error && (error.message + (error.status ? ' [' + error.status + ']' : ''))) || (rd && rd.error) || '') + '\nلو الرسالة فيها reset_progress شغّل ملف reset_progress.sql في سوبابيز') }
     ids.forEach(id => { delete answered[id] }); i = 0; quizView();
   });
   on('#sh', () => {
