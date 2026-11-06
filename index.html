@@ -590,8 +590,7 @@ function blocksView(y) {
     document.querySelectorAll('.blk').forEach(btn => btn.onclick = () => {
     const b = blocks[+btn.dataset.n], only = list.filter(x => x.block === b);
     const open = () => { if (only.length === 1) { curBlock = b; lecturesView(only[0]) } else subjectsView(y, b) };
-    if (!me.is_admin && blockPrice(y, b) !== null && !canBlock(y, b)) return lockedPrompt(y, b, open, FREE_FIRST_YEARS.includes(y) ? open : null);
-    open();
+    open();   // السعر بيظهر لما حد يدوس على محاضرة مقفولة (.lkb) مش على البلوك
   });
 }
 
