@@ -274,7 +274,7 @@ const FREE_FIRST = {1: 2, 3: 1};   // الفرقة: عدد أول محاضرات
 const FREE_FIRST_YEARS = Object.keys(FREE_FIRST).map(Number);
 const firstFree = (sub, ch) => { const n = FREE_FIRST[sub.year], m = /^\s*(\d+)\s*[-–]/.exec(ch || ''); return !!(n && m && +m[1] >= 1 && +m[1] <= n) };
 // محاضرات مجانية إضافية (بالاسم): الفرقة + البلوك + المادة + اسم المحاضرة
-const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}];
+const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}, {year: 3, block: /resp|rps/i, name: /امتحانات/, ch: /./}];
 const isFreeLec = (sub, ch) => firstFree(sub, ch) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
 const FREE_BLOCKS = [
