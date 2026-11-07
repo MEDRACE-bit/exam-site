@@ -1040,7 +1040,15 @@ async function lecturesView(sub) {
   let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + (pracMode ? 'PRACTICAL - ' : '') + esc(sub.name) + '</h2>';
   if (!Object.keys(groups).length) html += '<p>لسه مفيش أسئلة في ' + (pracMode ? 'العملي ده' : 'المادة دي') + '</p>';
   else {
-    Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true})).forEach(k => { html += card(k, lecName(k), groups[k]) });
+    const ks = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true}));
+    if (/امتحانات السنين/.test(sub.name)) {
+      [['امتحانات دفعة 35', /35/], ['امتحانات دفعة 34', /34/]].forEach(([t, re]) => {
+        const part = ks.filter(k => re.test(k)); if (!part.length) return;
+        html += '<h3 style="margin:18px 0 8px;color:#c0262d">' + t + '</h3>';
+        part.forEach(k => { html += card(k, lecName(k), groups[k]) });
+      });
+      ks.filter(k => !/3[45]/.test(k)).forEach(k => { html += card(k, lecName(k), groups[k]) });
+    } else ks.forEach(k => { html += card(k, lecName(k), groups[k]) });
   }
   app.innerHTML = html; bindTop(); on('#bk', backFromLec);
   document.querySelectorAll('.lec').forEach(b => b.onclick = () => sectionsView(b.dataset.k));
