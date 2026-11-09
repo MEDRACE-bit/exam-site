@@ -1117,7 +1117,7 @@ function typeKeyView(sc, k) {
     o2.push({t: '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({}, sc.f, {key: 1, src: FOCUS_TAG, nosrc: 0}), a: focA});
     return ktyRender(sc, k, o2);
   }
-  const opts = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}, {t: (PREDICTED_KEY.has(k) || (curSub && /psycholog/i.test((curSub.name || '') + ' ' + (curSub.block || '')))) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({key: 1}, sc.f), a: keyA}];
+  const opts = [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}, {t: (PREDICTED_KEY.has(k) || /pneumonia/i.test(k) || (curSub && /psycholog/i.test((curSub.name || '') + ' ' + (curSub.block || '')))) ? '⭐ مهم' : '⭐ المهم (ركّز عليه الدكتور)', f: Object.assign({key: 1}, sc.f), a: keyA}];
   ktyRender(sc, k, opts);
 }
 
