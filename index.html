@@ -604,6 +604,9 @@ const stShuf = a => { for (let k = a.length - 1; k > 0; k--) { const j = Math.fl
 const stDur = s => { s = Math.round(s); const m = Math.floor(s / 60), r = s % 60; return m ? m + ' دقيقة' + (r ? ' و' + r + ' ثانية' : '') : r + ' ثانية' };
 const stClock = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') };
 const stDate = t => { const d = new Date(t); return d.toLocaleDateString('ar-EG') + ' ' + d.toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'}) };
+const stSeenKey = () => 'stseen_' + (me ? me.id : '');
+const stSeenLoad = () => { try { const a = JSON.parse(ls.get(stSeenKey()) || '[]'); return new Set(Array.isArray(a) ? a : []) } catch (e) { return new Set() } };
+const stSeenSave = st => { try { ls.set(stSeenKey(), JSON.stringify(Array.from(st))) } catch (e) {} };
 let stTimer = null, stEx = null, stCfg = {}, stBm = new Set(), stBack = null;
 const stStop = () => { if (stTimer) { clearInterval(stTimer); stTimer = null } };
 
@@ -647,7 +650,9 @@ async function stHome(y, block) {
   const selF = () => stCfg.mode === 'saved' ? myF.filter(f => f.qs.length) : [];
   const allOn = () => stCfg.checked.size === selC().length && stCfg.fchecked.size === selF().length;
   stCfg.checked = new Set(selC().map(c => c.k));
-  const solved = c => c.qs.filter(q => att[q.id]).length;
+  const seen = stSeenLoad(); stCfg.fresh = true;
+  const baseQs = c => stCfg.mode === 'key' ? keyQs(c) : c.qs;
+  const seenIn = c => baseQs(c).filter(q => seen.has(q.id)).length;
   const pool = () => {
     if (stCfg.mode === 'saved') {
       const mp = new Map();
@@ -655,8 +660,10 @@ async function stHome(y, block) {
       myF.filter(f => stCfg.fchecked.has(f.id)).forEach(f => f.qs.forEach(q => mp.set(q.id, q)));
       return Array.from(mp.values());
     }
-    return list.filter(c => stCfg.checked.has(c.k)).flatMap(c => stCfg.mode === 'key' ? keyQs(c) : c.qs);
+    const all0 = list.filter(c => stCfg.checked.has(c.k)).flatMap(baseQs);
+    return stCfg.fresh ? all0.filter(q => !seen.has(q.id)) : all0;
   };
+  const poolAll = () => list.filter(c => stCfg.checked.has(c.k)).flatMap(baseQs);
   const setMode = md => {
     stCfg.mode = md; stCfg.fchecked = new Set(); stCfg.open = new Set();
     if (md === 'saved') {
@@ -688,7 +695,7 @@ async function stHome(y, block) {
         '<div class="svh">الأقسام <button type="button" class="link" id="sta" style="float:left;padding:0">' + (allOn() ? 'إلغاء الكل' : 'تحديد الكل') + '</button></div>';
       const chRow = (c, n) => {
         const k = cnt(c);
-        return '<label class="stc' + (k ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (k ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + (sm ? k + ' محفوظ' : stCfg.mode === 'key' ? k + ' مهم' : solved(c) + ' / ' + k + ' محلول') + '</small></label>';
+        return '<label class="stc' + (k ? '' : ' off') + '"><input type="checkbox" class="stcb" data-n="' + n + '"' + (stCfg.checked.has(c.k) ? ' checked' : '') + (k ? '' : ' disabled') + '><span>' + esc(lecName(c.name)) + '</span><small>' + (sm ? k + ' محفوظ' : (stCfg.mode === 'key' ? k + ' مهم · ' : '') + 'حليت ' + seenIn(c) + ' / ' + k + ' · باقي ' + (k - seenIn(c))) + '</small></label>';
       };
       const fRow = f => '<label class="stc' + (f.qs.length ? '' : ' off') + '"><input type="checkbox" class="stfb" data-f="' + f.id + '"' + (stCfg.fchecked.has(f.id) ? ' checked' : '') + (f.qs.length ? '' : ' disabled') + '><span>📁 ' + esc(f.lab || f.name) + (f.lab ? '<span style="display:block;font-size:.8em;opacity:.7">' + esc(f.name) + '</span>' : '') + '</span><small>' + f.qs.length + ' سؤال</small></label>';
       if (sm) {
@@ -722,6 +729,13 @@ async function stHome(y, block) {
         });
       }
 
+      if (!sm) {
+        const pa = poolAll(), ps = pa.filter(q => seen.has(q.id)).length;
+        h += '<div class="card" style="text-align:center"><b>حليت ' + ps + ' من ' + pa.length + ' · باقي ' + (pa.length - ps) + '</b>' +
+          '<label style="display:flex;gap:8px;align-items:center;justify-content:center;margin-top:8px;cursor:pointer"><input type="checkbox" id="stfresh" style="width:auto;margin:0"' + (stCfg.fresh ? ' checked' : '') + '><span>أسئلة جديدة بس (متتكررش اللي حليتها)</span></label>' +
+          (ps ? '<button type="button" class="link" id="stseenr" style="margin-top:6px">🔄 ابدأ من الأول (صفّر اللي حليته)</button>' : '') +
+          (stCfg.fresh && pa.length && !av ? '<div class="note">خلصت كل الأسئلة المختارة 🎉 دوس "ابدأ من الأول" أو شيل علامة "أسئلة جديدة بس"</div>' : '') + '</div>';
+      }
       h += '<div class="svh">عدد الأسئلة <small>(المتاح: ' + av + ')</small></div>' +
         '<input type="number" id="stn" inputmode="numeric" min="1" max="' + av + '" value="' + stCfg.n + '" style="text-align:center;font-weight:700">' +
         '<div class="card" id="stt2" style="text-align:center">' + timeTxt() + '</div>' +
@@ -754,6 +768,8 @@ async function stHome(y, block) {
     on('#sta', () => { if (allOn()) { stCfg.checked = new Set(); stCfg.fchecked = new Set() } else { stCfg.checked = new Set(selC().map(c => c.k)); stCfg.fchecked = new Set(selF().map(f => f.id)) } render() });
     const ni = $('#stn'); if (ni) ni.oninput = () => { stCfg.n = Math.max(1, Math.min(+ni.value || 1, pool().length || 1)); const t = $('#stt2'); if (t) t.innerHTML = timeTxt() };
     on('#stg', () => { const av2 = pool().length; if (!av2) return alert('اختار قسم واحد على الأقل'); const n = Math.max(1, Math.min(+($('#stn').value) || stCfg.n, av2)); stCfg.n = n; startExam(n) });
+    const fr0 = $('#stfresh'); if (fr0) fr0.onchange = () => { stCfg.fresh = fr0.checked; keep() };
+    on('#stseenr', () => { if (!confirm('تصفّر الأسئلة اللي حليتها في الأقسام المختارة وتبدأ من الأول؟')) return; poolAll().forEach(q => seen.delete(q.id)); stSeenSave(seen); keep() });
     on('#sthc', () => { if (!confirm('تمسح كل نتايج الاختبارات المحفوظة للبلوك ده؟')) return; stSaveAll(stLoad().filter(r => !(r.year === y && r.block === block))); render() });
     document.querySelectorAll('.sth').forEach(b => b.onclick = () => { if (!confirm('تحذف النتيجة دي؟')) return; stSaveAll(stLoad().filter(r => String(r.id) !== b.dataset.id)); render() });
     document.querySelectorAll('.stv').forEach(b => b.onclick = () => stReviewView(b.dataset.id));
@@ -862,6 +878,7 @@ async function stFinish(auto) {
   const graded = E.qs.length - err;
   E.result = {id: Date.now(), at: new Date().toISOString(), year: E.y, block: E.block, total: E.qs.length, correct: ok, wrong: bad, skipped: skip, used, secs: E.secs, pct: E.qs.length ? Math.round(100 * ok / E.qs.length) : 0,
     d: E.qs.map(q => ({b: q.body, ch: q.choices, g: q.chapter || '', c: E.ans[q.id] === undefined ? null : E.ans[q.id], r: res[q.id] ? res[q.id].c : null}))};
+  try { const sn = stSeenLoad(); E.qs.forEach(q => { if (E.ans[q.id] !== undefined && res[q.id]) sn.add(q.id) }); stSeenSave(sn) } catch (e) {}
   stResultView(wrong, err, auto);
 }
 
