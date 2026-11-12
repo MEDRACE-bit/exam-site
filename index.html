@@ -1077,6 +1077,8 @@ const AUTHOR_TAGS = ['DR DINA', 'FORMATIVE', 'أسئلة الدكتور آخر �
 const FOCUS_TAG = 'DR FOCUS';
 // تصنيفات بتظهر جوّه خانة MCQ نفسها (عادي / المهم / أسئلة الدكتور / EXTRA / أسئلة سنين سابقة)
 const INNER_TAGS = ['أسئلة الدكتور', 'EXTRA', 'أسئلة سنين سابقة'];
+// خانة لوحدها بتظهر تحت كل الأسئلة (بعد MCQ / Written)
+const TAIL_TAGS = ['أسئلة اثناء الشرح'];
 // 5) question sections of a lecture: all / important / by source / by type
 function sectionsView(k) {
   if (k === undefined) k = curLec;
@@ -1085,14 +1087,16 @@ function sectionsView(k) {
   const secs = [];
   const mySavedAll = arr.filter(q => saved.has(q.id)), mySaved = mySavedAll.filter(q => !inFolder(q.id));
   if (mySavedAll.length) secs.push({t: '🔖 المحفوظات', saved: 1, a: mySaved});
-  Array.from(new Set(arr.map(q => q.source_tag).filter(t => t && t !== FOCUS_TAG && !INNER_TAGS.includes(t) && !AUTHOR_TAGS.includes(t)))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
+  Array.from(new Set(arr.map(q => q.source_tag).filter(t => t && t !== FOCUS_TAG && !INNER_TAGS.includes(t) && !AUTHOR_TAGS.includes(t) && !TAIL_TAGS.includes(t)))).forEach(s => secs.push({t: s, f: {src: s}, a: arr.filter(q => q.source_tag === s)}));
   ['mcq', 'written'].forEach(t => {
     const a2 = arr.filter(q => q.type === t), nm = t === 'mcq' ? 'MCQ' : 'Written';
     const aus = Array.from(new Set(a2.map(q => q.source_tag).filter(x => AUTHOR_TAGS.includes(x))));
-    const plain = a2.filter(q => !AUTHOR_TAGS.includes(q.source_tag));
-    if (plain.length) secs.push({t: nm, f: aus.length ? {type: t, nosrc: 1} : {type: t}, a: plain});
+    const plain = a2.filter(q => !AUTHOR_TAGS.includes(q.source_tag) && !TAIL_TAGS.includes(q.source_tag));
+    const hasTail = a2.some(q => TAIL_TAGS.includes(q.source_tag));
+    if (plain.length) secs.push({t: nm, f: (aus.length || hasTail) ? {type: t, nosrc: 1} : {type: t}, a: plain});
     aus.forEach(au => secs.push({t: nm + ' (' + au + ')', f: {type: t, src: au}, a: a2.filter(q => q.source_tag === au)}));
   });
+  TAIL_TAGS.forEach(tg => { const a3 = arr.filter(q => q.source_tag === tg); if (a3.length) secs.push({t: tg, f: {src: tg}, a: a3}); });
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
