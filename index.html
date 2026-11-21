@@ -1098,6 +1098,17 @@ function sectionsView(k) {
     aus.forEach(au => secs.push({t: nm + ' (' + au + ')', f: {type: t, src: au}, a: a2.filter(q => q.source_tag === au)}));
   });
   TAIL_TAGS.forEach(tg => { const a3 = arr.filter(q => q.source_tag === tg); if (a3.length) secs.push({t: tg, f: {src: tg}, a: a3}); });
+  // محاضرة كلها ريتن ومقسمة لمواضيع (خانات): زر Written واحد عليه سهم ▾ يفتح المواضيع
+  {
+    const tps = secs.filter(x => x.f && x.f.src && !x.f.type && !x.saved && !TAIL_TAGS.includes(x.f.src));
+    if (arr.length && arr.every(q => q.type === 'written') && tps.length >= 2 && arr.every(q => tps.some(x => x.f.src === q.source_tag))) {
+      const wi = secs.indexOf(tps[0]);
+      const rest = secs.filter(x => !tps.includes(x) && !(x.f && x.f.type === 'written' && !x.f.src));
+      const pos = Math.min(wi, rest.length);
+      rest.splice(pos, 0, {t: 'Written', f: {type: 'written'}, a: arr, topics: tps});
+      secs.length = 0; rest.forEach(x => secs.push(x));
+    }
+  }
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => '<button class="sub sec" data-n="' + n + '"><b>' + esc(s.t) + '</b><br>' + (s.plain
       ? '<small>' + s.a.length + ' سؤال للمراجعة</small>'
@@ -1106,6 +1117,7 @@ function sectionsView(k) {
   document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
     const sc = secs[+b.dataset.n];
     if (sc.saved) return savedTypes(k);
+    if (sc.topics) { view = 'keytypes'; return ktyRender(sc, k, [{t: 'كل الأسئلة', f: Object.assign({}, sc.f), a: sc.a}].concat(sc.topics.map(x => ({t: x.t, f: {type: 'written', src: x.f.src}, a: x.a})))); }
     if (sc.f.type && sc.a.some(q => q.is_key_point || INNER_TAGS.includes(q.source_tag))) return typeKeyView(sc, k);
     startQuiz(sc.f);
   });
