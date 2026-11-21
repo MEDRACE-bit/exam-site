@@ -277,9 +277,10 @@ const firstFree = (sub, ch) => { const n = FREE_FIRST[sub.year], m = /^\s*(\d+)\
 const FREE_LECS = [{year: 3, block: /resp|rps/i, name: /micro/i, ch: /^\s*3\s*[-–]\s*Community-Acquired/i}, {year: 3, block: /resp|rps/i, name: /امتحانات/, ch: /./}];
 const isFreeLec = (sub, ch) => firstFree(sub, ch) || FREE_LECS.some(x => x.year === sub.year && x.block.test(sub.block || '') && x.name.test(sub.name || '') && x.ch.test(ch || ''));
 const passOn = (y, b) => (blockShop.passes[bkKey(y, b)] || 0) > Date.now();
-const HIDDEN_BLOCKS = [{year: 3, block: /^EBM$/i}];   // بلوك EBM مخفي عن الطلاب لحد ما تفتحه (امسح السطر ده)
+const HIDDEN_BLOCKS = [];   // بلوكات مخفية عن الطلاب (EBM اتفتح كهدية)
 const FREE_BLOCKS = [
   {year: 1, block: /^ethic/i},   // بلوكات مجانية بالكامل
+  {year: 3, block: /^EBM$/i},   // EBM هدية (مجاني بالكامل)
   {year: 1, block: /^(physiology|histology)$/i, until: '2026-11-11T10:00:00+02:00'}   // مجاني أسبوع (لحد 11 نوفمبر 10 ص)
 ];
 const freeBlock = (y, b) => FREE_BLOCKS.some(x => x.year === y && x.block.test(String(b || '').trim()) && (!x.until || Date.now() < Date.parse(x.until)));
