@@ -1106,7 +1106,7 @@ function sectionsView(k) {
   document.querySelectorAll('.sec').forEach(b => b.onclick = () => {
     const sc = secs[+b.dataset.n];
     if (sc.saved) return savedTypes(k);
-    if (sc.f.type && sc.a.some(q => q.is_key_point)) return typeKeyView(sc, k);
+    if (sc.f.type && sc.a.some(q => q.is_key_point || INNER_TAGS.includes(q.source_tag))) return typeKeyView(sc, k);
     startQuiz(sc.f);
   });
 }
