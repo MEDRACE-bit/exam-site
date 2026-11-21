@@ -568,7 +568,8 @@ function blocksView(y) {
   const list = subs.filter(x => x.year === y);
   const blocks = [...new Set(list.map(x => x.block))].sort((a, b) => {
     const o = BLOCK_ORDER[y] || [], ia = o.indexOf(a), ib = o.indexOf(b);
-    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
+    const wa = /^ebm$/i.test(String(a).trim()) ? 9999 : (ia < 0 ? 999 : ia), wb = /^ebm$/i.test(String(b).trim()) ? 9999 : (ib < 0 ? 999 : ib);
+    return wa - wb || a.localeCompare(b);
   });
   let html = topBar() + qrBtn() + (me.is_admin ? BK('‹ الفرق') : '') + crumb() + '<h2>' + yName(y) + ' - اختار البلوك</h2>';
   if (!blocks.length) html += '<p>لسه مفيش مواد</p>';
@@ -1612,7 +1613,7 @@ async function walletView(forced) {
 function blocksBox() {
   const items = Object.keys(blockShop.prices).map(k => { const i = k.indexOf('|'); return {y: +k.slice(0, i), b: k.slice(i + 1), pr: blockShop.prices[k], old: blockShop.old[k]} });
   if (!items.length && !(blockShop.bundles || []).length) return '';
-  items.sort((a, b) => a.y - b.y || ((BLOCK_ORDER[a.y] || []).indexOf(a.b) + 1 || 999) - ((BLOCK_ORDER[b.y] || []).indexOf(b.b) + 1 || 999) || a.b.localeCompare(b.b));
+  items.sort((a, b) => a.y - b.y || ((/^ebm$/i.test(String(a.b).trim()) ? 9999 : ((BLOCK_ORDER[a.y] || []).indexOf(a.b) + 1 || 999)) - (/^ebm$/i.test(String(b.b).trim()) ? 9999 : ((BLOCK_ORDER[b.y] || []).indexOf(b.b) + 1 || 999))) || a.b.localeCompare(b.b));
   return '<div class="card" id="blkbox"><b>🧩 اشتراك البلوكات</b><p><small>الاشتراك دائم، ويفتح البلوك + اختبر نفسك.</small></p>' + (blockShop.bundles || []).map(g => '<div class="stH"><div><b>🎁 كل البلوكات المدفوعة</b><br><small>' + g.blocks.map(esc).join(' - ') + '</small></div><span>' + (bundleOwned(g) ? '✅ مفتوحة' : me.is_admin ? priceTxt(g.old_price, '<b>' + g.price + '</b>') + ' <i class="coin"></i>' : '<button type="button" class="btn bdb" data-y="' + g.year + '">🛒 اشتري الكل (دائم) ' + priceTxt(g.old_price, g.price) + ' <i class="coin"></i></button>') + '</span></div>').join('') + items.map(x => {
     const own = blockShop.owned.has(bkKey(x.y, x.b));
     return '<div class="stH"><div><b>' + esc(x.b) + '</b><br><small>- البلوك<br>- اختبر نفسك</small></div><span>' +
