@@ -1100,12 +1100,13 @@ function sectionsView(k) {
   TAIL_TAGS.forEach(tg => { const a3 = arr.filter(q => q.source_tag === tg); if (a3.length) secs.push({t: tg, f: {src: tg}, a: a3}); });
   // محاضرة كلها ريتن ومقسمة لمواضيع (خانات): زر Written واحد عليه سهم ▾ يفتح المواضيع
   {
-    const tps = secs.filter(x => x.f && x.f.src && !x.f.type && !x.saved && !TAIL_TAGS.includes(x.f.src));
-    if (arr.length && arr.every(q => q.type === 'written') && tps.length >= 2 && arr.every(q => tps.some(x => x.f.src === q.source_tag))) {
+    const SOLO = ['فايل 35'];
+    const tps = secs.filter(x => x.f && x.f.src && !x.f.type && !x.saved && !TAIL_TAGS.includes(x.f.src) && !SOLO.includes(x.f.src));
+    if (arr.length && arr.every(q => q.type === 'written') && tps.length >= 2 && arr.every(q => SOLO.includes(q.source_tag) || tps.some(x => x.f.src === q.source_tag))) {
       const wi = secs.indexOf(tps[0]);
       const rest = secs.filter(x => !tps.includes(x) && !(x.f && x.f.type === 'written' && !x.f.src));
       const pos = Math.min(wi, rest.length);
-      rest.splice(pos, 0, {t: 'Written', f: {type: 'written'}, a: arr, topics: tps});
+      rest.splice(pos, 0, {t: 'Written', f: {type: 'written'}, a: arr.filter(q => !SOLO.includes(q.source_tag)), topics: tps});
       secs.length = 0; rest.forEach(x => secs.push(x));
     }
   }
