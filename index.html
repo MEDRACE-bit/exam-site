@@ -487,6 +487,9 @@ function blockedView(r) {
 }
 
 const LEC_ALL = '__all__';
+const LAST_LECS = ['question bank for summer course', 'final ebm exam for summer course'];   // محاضرات تظهر آخر القايمة
+const lecRank = c => LAST_LECS.indexOf(String(c || '').trim().toLowerCase());
+const lecCmp = (a, b) => { const x = lecRank(a), y = lecRank(b); return (x >= 0 || y >= 0) ? x - y : a.localeCompare(b, 'ar', {numeric: true}) };
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
 const PREDICTED_KEY = new Set(['1 - Respiratory System', '2 - Development of the Urinary System', '1 - Lipids', '2 - Protein Chemistry', '3 - Carbohydrates', '4 - Biological Oxidation', '1 - Bacteria causing upper respiratory tract infections', '1 - Functional organization of the Kidney and renal blood flow', '2 - Urine Formation 1: Glomerular Filtration', '3 - Urine Formation 2: Glomerular Filtration', '7 - Glycolysis and Pyruvate Oxidation', '5 - Stretch reflexes I & II', '1 - Thinking', '8 - Krebs cycle', '1 - Basic pathology of CNS & Pathology of cerebrovascular diseases']);
 const chOf = m => (m.chapter && m.chapter.trim()) || '';
@@ -1046,7 +1049,7 @@ async function lecturesView(sub) {
     let h = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + esc(sub.name) + '</h2>';
     if (le) h += '<p>حصلت مشكلة، حاول تاني</p>';
     else if (!(ls || []).filter(x => isPrac(x.chapter) === pracMode).length) h += '<p>لسه مفيش أسئلة في المادة دي</p>';
-    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => a.chapter.localeCompare(b.chapter, 'ar', {numeric: true})).forEach(x => { h += (!pracMode && isFreeLec(sub, x.chapter)) ? '<button class="sub lec freel" data-k="' + esc(x.chapter.trim()) + '"><b>🎁 ' + esc(lecName(x.chapter)) + '</b><br><small>' + (sub.year === 1 ? 'هدية' : 'مجانية') + ' · ' + x.n + ' سؤال</small></button>' : '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
+    else (ls || []).filter(x => isPrac(x.chapter) === pracMode).slice().sort((a, b) => lecCmp(a.chapter, b.chapter)).forEach(x => { h += (!pracMode && isFreeLec(sub, x.chapter)) ? '<button class="sub lec freel" data-k="' + esc(x.chapter.trim()) + '"><b>🎁 ' + esc(lecName(x.chapter)) + '</b><br><small>' + (sub.year === 1 ? 'هدية' : 'مجانية') + ' · ' + x.n + ' سؤال</small></button>' : '<button class="sub locked lkb"><b>🔒 ' + esc(lecName(x.chapter)) + '</b><br><small>' + x.n + ' سؤال</small></button>' });
     app.innerHTML = h; bindTop(); on('#bk', backFromLec);
     document.querySelectorAll('.lkb').forEach(b => b.onclick = () => lockedPrompt(pracMode ? 0 : sub.year, sub.block, () => lecturesView(sub)));
     document.querySelectorAll('.freel').forEach(b => b.onclick = async () => { if (await loadLecMeta(sub)) sectionsView(b.dataset.k) });
@@ -1061,7 +1064,7 @@ async function lecturesView(sub) {
   let html = topBar() + BK(subs.filter(x => x.year === curYear && x.block === curBlock).length === 1 ? '‹ البلوكات' : '‹ المواد') + crumb() + '<h2>' + icon(sub.name) + (pracMode ? 'PRACTICAL - ' : '') + esc(sub.name) + '</h2>';
   if (!Object.keys(groups).length) html += '<p>لسه مفيش أسئلة في ' + (pracMode ? 'العملي ده' : 'المادة دي') + '</p>';
   else {
-    const ks = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar', {numeric: true}));
+    const ks = Object.keys(groups).sort(lecCmp);
     if (/امتحانات السنين/.test(sub.name)) {
       [['امتحانات دفعة 35', /35/], ['امتحانات دفعة 34', /34/]].forEach(([t, re]) => {
         const part = ks.filter(k => re.test(k)); if (!part.length) return;
