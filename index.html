@@ -487,7 +487,7 @@ function blockedView(r) {
 }
 
 const LEC_ALL = '__all__';
-const LAST_LECS = ['question bank for summer course', 'final ebm exam for summer course'];   // محاضرات تظهر آخر القايمة
+const LAST_LECS = ['question bank for summer course', 'final ebm exam for summer course', 'أسئلة السنين السابقة'];   // محاضرات تظهر آخر القايمة
 const lecRank = c => LAST_LECS.indexOf(String(c || '').trim().toLowerCase());
 const lecCmp = (a, b) => { const x = lecRank(a), y = lecRank(b); return (x >= 0 || y >= 0) ? x - y : a.localeCompare(b, 'ar', {numeric: true}) };
 // محاضرات الأسئلة المهمة فيها بتوقّع (الدكتور ما حدّدهاش): بتظهر "مهم" من غير "ركّز عليها الدكتور"
