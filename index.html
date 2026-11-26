@@ -1375,7 +1375,7 @@ function quizView() {
       mark(k, data.correct_index);
     });
   } else {
-    box.innerHTML = '<textarea id="wa" rows="4" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
+    box.innerHTML = '<textarea id="wa" rows="4" dir="ltr" style="text-align:left" placeholder="اكتب إجابتك هنا..."></textarea><button class="btn" id="rv" style="background:#2a1616">إظهار الإجابة النموذجية</button><div id="mo" class="card" style="display:none" dir="auto"></div>';
     on('#rv', async () => {
       const {data, error} = await sb.rpc('reveal_model_answer', {qid: q.id});
       if (error) return alert(accMsg(error));
