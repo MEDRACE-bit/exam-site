@@ -1116,10 +1116,10 @@ function sectionsView(k) {
       secs.length = 0; rest.forEach(x => secs.push(x));
     }
   }
-  // خانة MCQ/Written العادية لو هي نفس أسئلة خانة بتاج واحد بالظبط، ماتتعرضش مرتين
+  // خانة MCQ/Written العادية لو كل أسئلتها موجودة أصلًا في خانات بتاجات (زي خانة لكل اختبار)، ماتتعرضش مرتين
   for (let i = secs.length - 1; i >= 0; i--) {
     const x = secs[i];
-    if (x.f && x.f.type && !x.f.src && !x.topics && !x.saved && x.a.length && secs.some(y => y !== x && y.f && y.f.src && !y.f.type && !y.saved && y.a.length === x.a.length && x.a.every(q => y.a.includes(q)))) secs.splice(i, 1);
+    if (x.f && x.f.type && !x.f.src && !x.topics && !x.saved && x.a.length && x.a.every(q => secs.some(y => y !== x && y.f && y.f.src && !y.f.type && !y.saved && y.a.includes(q)))) secs.splice(i, 1);
   }
   app.innerHTML = topBar() + BK('‹ المحاضرات') + crumb() + '<h2>' + esc(lecName(k)) + '</h2>' +
     secs.map((s, n) => {
